@@ -378,6 +378,20 @@ const defaultProfile: UserProfile = {
   xp: 0,
 };
 
+const getInitialProfile = (): UserProfile => {
+  if (typeof window === "undefined") return defaultProfile;
+  try {
+    const saved = localStorage.getItem("3itc_active_profile");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && (parsed.firstName || parsed.lastName || parsed.email)) {
+        return { ...defaultProfile, ...parsed };
+      }
+    }
+  } catch (_) {}
+  return defaultProfile;
+};
+
 const defaultLandingContent: LandingContent = {
   hero: {
     headline: "Bangun Skill Digital, Raih Karier Impian",
@@ -493,7 +507,7 @@ const defaultEvents: EventItem[] = [
 ];
 
 const initialState: StoreState = {
-  profile: defaultProfile,
+  profile: getInitialProfile(),
   courses: [],
   enrollments: [],
   users: [],
@@ -1262,6 +1276,15 @@ const StoreContext = createContext<StoreContextType | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+
+  // Sync state.profile to localStorage whenever it changes
+  useEffect(() => {
+    if (state.profile && (state.profile.firstName || state.profile.lastName || state.profile.email)) {
+      try {
+        localStorage.setItem("3itc_active_profile", JSON.stringify(state.profile));
+      } catch (_) {}
+    }
+  }, [state.profile]);
 
   // ─── Firestore Real-time Sync (Primary DB) + localStorage offline cache ───
   useEffect(() => {

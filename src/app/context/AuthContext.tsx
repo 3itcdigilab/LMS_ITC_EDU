@@ -64,6 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole(null);
     setIsGuest(false);
     setOriginalRole(null);
+    try {
+      localStorage.removeItem("3itc_active_profile");
+      localStorage.removeItem("3itc_active_email");
+    } catch (_) {}
   };
 
   const switchRole = (r: Role) => {
