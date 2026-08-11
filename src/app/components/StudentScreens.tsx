@@ -1556,14 +1556,7 @@ export function CommunityForum() {
   const currentUserName = `${state.profile?.firstName || ""} ${state.profile?.lastName || ""}`.trim() || "Siswa 3ITC";
   const currentUserRole = "student";
 
-  const [repliesMap, setRepliesMap] = useState<Record<string, Array<{ id: string; authorName: string; body: string; createdAt: string }>>>(() => {
-    try {
-      const saved = localStorage.getItem("3itc_forum_replies_map");
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
+  const [repliesMap, setRepliesMap] = useState<Record<string, Array<{ id: string; authorName: string; body: string; createdAt: string }>>>({});
 
   const [title, setTitle] = useState("");
   const [threadCat, setThreadCat] = useState("Programming");
@@ -1688,14 +1681,7 @@ export function CommunityForum() {
 
     const updatedReplies = [...(repliesMap[selectedThread.id] || []), newReply];
     const nextMap = { ...repliesMap, [selectedThread.id]: updatedReplies };
-
     setRepliesMap(nextMap);
-    try {
-      localStorage.setItem("3itc_forum_replies_map", JSON.stringify(nextMap));
-    } catch (err) {
-      console.error(err);
-    }
-
     setReplyText("");
     toast.success("Balasan berhasil dikirim!");
     
@@ -1727,11 +1713,6 @@ export function CommunityForum() {
     const updatedReplies = (repliesMap[selectedThread.id] || []).filter(r => r.id !== replyId);
     const nextMap = { ...repliesMap, [selectedThread.id]: updatedReplies };
     setRepliesMap(nextMap);
-    try {
-      localStorage.setItem("3itc_forum_replies_map", JSON.stringify(nextMap));
-    } catch (err) {
-      console.error(err);
-    }
     toast.success("Balasan berhasil dihapus!");
   };
 
@@ -1749,11 +1730,6 @@ export function CommunityForum() {
     );
     const nextMap = { ...repliesMap, [selectedThread.id]: updatedReplies };
     setRepliesMap(nextMap);
-    try {
-      localStorage.setItem("3itc_forum_replies_map", JSON.stringify(nextMap));
-    } catch (err) {
-      console.error(err);
-    }
     setEditingReplyId(null);
     setEditText("");
     toast.success("Balasan berhasil diperbarui!");
@@ -2649,27 +2625,12 @@ export function EventsPage() {
   const eventsList = state.events || [];
 
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
-  const [registeredIds, setRegisteredIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem("3itc_registered_event_ids");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [registeredIds, setRegisteredIds] = useState<string[]>([]);
 
   const handleRegister = (evtId: string) => {
     if (registeredIds.includes(evtId)) return;
     actions.registerEvent(evtId);
-    setRegisteredIds(prev => {
-      const next = [...prev, evtId];
-      try {
-        localStorage.setItem("3itc_registered_event_ids", JSON.stringify(next));
-      } catch (e) {
-        console.error(e);
-      }
-      return next;
-    });
+    setRegisteredIds(prev => [...prev, evtId]);
     toast.success("Berhasil mendaftar event! Link webinar & reminder telah dikirim.");
   };
 
