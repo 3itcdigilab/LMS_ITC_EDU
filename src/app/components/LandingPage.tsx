@@ -430,6 +430,7 @@ export function LandingPage() {
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [activePopupItem, setActivePopupItem] = useState<{ type: 'category' | 'feature'; data: any } | null>(null);
 
+  const lc = state.landingContent;
   const allPublished = state.courses?.filter(c => c.status === 'published') || [];
   const explicitFeaturedCourses = allPublished.filter(c => (c as any).isFeatured);
   const publishedCourses = (explicitFeaturedCourses.length > 0 ? explicitFeaturedCourses : allPublished).slice(0, 6);
