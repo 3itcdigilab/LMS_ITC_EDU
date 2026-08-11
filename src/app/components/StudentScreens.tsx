@@ -2220,12 +2220,25 @@ export function CommunityForum() {
                               {t.title}
                             </p>
                           </div>
-                          <span
-                            onClick={() => setSelectedThread(t)}
-                            className="text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity shrink-0 flex items-center gap-1 cursor-pointer"
-                          >
-                            Buka <ChevronRight className="size-3" />
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                actions.deleteForumThread(t.id);
+                                toast.success("Thread diskusi berhasil dihapus!");
+                              }}
+                              title="Hapus Thread"
+                              className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                            <span
+                              onClick={() => setSelectedThread(t)}
+                              className="text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 cursor-pointer"
+                            >
+                              Buka <ChevronRight className="size-3" />
+                            </span>
+                          </div>
                         </div>
                         {t.body && <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{t.body}</p>}
                         <p className="mt-1.5 text-xs text-muted-foreground">

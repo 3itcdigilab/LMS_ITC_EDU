@@ -1622,14 +1622,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     }).catch(_ => {});
 
-    getDocs(collection(db, "forumThreads")).then(snap => {
-      if (snap.empty) {
-        const defaultForumList = [
-          { id: "thread-1", title: "Diskusi: Best Practice arsitektur Next.js App Router", body: "Bagaimana cara terbaik mengorganisasi Server vs Client Components?", authorName: "Tubagus Aria", category: "Programming", replies: 2, createdAt: new Date().toISOString() }
-        ];
-        defaultForumList.forEach(t => fsSet("forumThreads", t.id, t));
-      }
-    }).catch(_ => {});
+    // Delete dummy thread-1 from Firestore DB if exists
+    fsDel("forumThreads", "thread-1");
 
     getDocs(collection(db, "feedPosts")).then(snap => {
       if (snap.empty) {
