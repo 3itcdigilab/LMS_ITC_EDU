@@ -1442,6 +1442,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     }, err => console.warn("Firestore forumThreads listener:", err));
 
+    const unsubEvents = onSnapshot(collection(db, "events"), (snap) => {
+      if (!snap.empty) {
+        const events = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+        dispatch({ type: "HYDRATE", payload: { events } });
+        cacheSet("3itc_events_cache", events);
+      }
+    }, err => console.warn("Firestore events listener:", err));
+
     const unsubLanding = onSnapshot(doc(db, "settings", "landing"), (snap) => {
       if (snap.exists()) {
         const landingContent = snap.data() as LandingContent;
@@ -1452,7 +1460,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     return () => {
       unsubProfiles(); unsubInstitutions(); unsubCourses();
-      unsubEnrollments(); unsubReviews(); unsubFeed(); unsubForum(); unsubLanding();
+      unsubEnrollments(); unsubReviews(); unsubFeed(); unsubForum(); unsubEvents(); unsubLanding();
     };
   }, []);
 
@@ -1608,11 +1616,42 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       fsDel("forumThreads", id);
     },
 
-    // ── Events (local only for now) ──
-    addEvent: d => dispatch({ type: "ADD_EVENT", payload: d }),
-    updateEvent: d => dispatch({ type: "UPDATE_EVENT", payload: d }),
-    deleteEvent: id => dispatch({ type: "DELETE_EVENT", payload: id }),
-    registerEvent: id => dispatch({ type: "REGISTER_EVENT", payload: id }),
+    // ── Events (Cloud Firestore) ──
+    addEvent: d => {
+      const evtId = `evt-${Date.now()}`;
+      const newEvt = {
+        id: evtId,
+        title: d.title,
+        date: d.date,
+        time: d.time || "19:00 WIB",
+        type: d.type || "Webinar",
+        speaker: d.speaker || "Praktisi Industri",
+        seats: d.seats || 100,
+        imageUrl: d.imageUrl || "",
+        description: d.description || "",
+        meetingUrl: d.meetingUrl || "",
+        gformUrl: d.gformUrl || "",
+        thankYouMessage: d.thankYouMessage || "",
+        registrations: 0,
+        createdAt: new Date().toISOString(),
+      };
+      dispatch({ type: "ADD_EVENT", payload: newEvt });
+      fsSet("events", evtId, newEvt);
+    },
+    updateEvent: p => {
+      dispatch({ type: "UPDATE_EVENT", payload: p });
+      fsSet("events", p.id, p);
+    },
+    deleteEvent: id => {
+      dispatch({ type: "DELETE_EVENT", payload: id });
+      fsDel("events", id);
+    },
+    registerEvent: id => {
+      dispatch({ type: "REGISTER_EVENT", payload: id });
+      const evt = (state.events || []).find(e => e.id === id);
+      const currentReg = (evt?.registrations || 0) + 1;
+      fsSet("events", id, { registrations: currentReg });
+    },
 
     // ── Portfolio & Certificates (local only) ──
     addPortfolio: d => dispatch({ type: "ADD_PORTFOLIO", payload: d }),

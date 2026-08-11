@@ -1313,12 +1313,42 @@ export function EventManagement() {
   const [gformUrl, setGformUrl] = useState("");
   const [thankYouMessage, setThankYouMessage] = useState("");
 
+  const compressImage = (dataUrl: string, maxWidth: number, maxHeight: number, quality = 0.8): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        } else {
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    });
+  };
+
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setImageUrl(reader.result as string);
+      reader.onloadend = async () => {
+        const rawResult = reader.result as string;
+        const compressed = await compressImage(rawResult, 1000, 500, 0.8);
+        setImageUrl(compressed);
         toast.success("Banner foto event berhasil diunggah!");
       };
       reader.readAsDataURL(file);
