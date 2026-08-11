@@ -1083,7 +1083,7 @@ export function AnalyticsDashboard() {
 /* ─── Landing Content Manager ─────────────────────────────────────────────── */
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { Textarea } from "./ui/textarea";
-import { type LandingContent, type LandingFeature, type LandingPartner, type LandingTestimonial, type LandingBannerSlide } from "../store/Store";
+import { type LandingContent, type LandingFeature, type LandingPartner, type LandingTestimonial, type LandingBannerSlide, type LandingCategory } from "../store/Store";
 
 function uid() { return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
 
@@ -1099,7 +1099,8 @@ export function LandingContentManager() {
   const [heroStats, setHeroStats] = useState(lc.hero?.stats || []);
 
   const [bannerSlides, setBannerSlides] = useState<LandingBannerSlide[]>(lc.bannerSlides || []);
-  const [features, setFeatures] = useState(lc.features || []);
+  const [categories, setCategories] = useState<LandingCategory[]>(lc.categories || []);
+  const [features, setFeatures] = useState<LandingFeature[]>(lc.features || []);
   const [partners, setPartners] = useState(lc.partners || []);
   const [testimonials, setTestimonials] = useState(lc.testimonials || []);
   const [platformStats, setPlatformStats] = useState(lc.platformStats || []);
@@ -1111,6 +1112,7 @@ export function LandingContentManager() {
     actions.updateLanding({
       hero: { headline: heroHeadline, tagline: heroTagline, ctaText: heroCtaText, stats: heroStats },
       bannerSlides,
+      categories,
       features,
       partners,
       testimonials,
@@ -1139,6 +1141,7 @@ export function LandingContentManager() {
         <TabsList className="mb-4 flex-wrap">
           <TabsTrigger value="hero">Hero</TabsTrigger>
           <TabsTrigger value="slides">Banner Slides</TabsTrigger>
+          <TabsTrigger value="categories">Kategori</TabsTrigger>
           <TabsTrigger value="features">Fitur</TabsTrigger>
           <TabsTrigger value="partners">Mitra</TabsTrigger>
           <TabsTrigger value="testimonials">Testimoni</TabsTrigger>
@@ -1299,23 +1302,267 @@ export function LandingContentManager() {
           </Card>
         </TabsContent>
 
+        {/* ── Categories ── */}
+        <TabsContent value="categories">
+          <Card className="p-6">
+            <CardHeader className="p-0 mb-4">
+              <CardTitle>Kategori Pembelajaran & Pop-up Detail</CardTitle>
+            </CardHeader>
+            <div className="space-y-4">
+              {categories.map((cat, i) => (
+                <div key={cat.id || i} className="rounded-xl border border-border p-4 space-y-3 bg-card">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase text-primary">Kategori #{i + 1}</span>
+                    <Button variant="ghost" size="sm" onClick={() => setCategories(categories.filter((_, j) => j !== i))}>
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="text-xs font-medium mb-1 block">Nama Kategori</label>
+                      <Input
+                        placeholder="cth: Programming"
+                        value={cat.name}
+                        onChange={e => { const n = [...categories]; n[i] = { ...cat, name: e.target.value }; setCategories(n); }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium mb-1 block">Icon Lucide / Image URL</label>
+                      <Input
+                        placeholder="cth: Code atau https://..."
+                        value={cat.icon}
+                        onChange={e => { const n = [...categories]; n[i] = { ...cat, icon: e.target.value }; setCategories(n); }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Penjelasan Detail (Pop-up Slide)</label>
+                    <Textarea
+                      rows={2}
+                      placeholder="Penjelasan lengkap saat kartu kategori diklik..."
+                      value={cat.description || ""}
+                      onChange={e => { const n = [...categories]; n[i] = { ...cat, description: e.target.value }; setCategories(n); }}
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-4 items-center pt-1">
+                    <div className="sm:col-span-1">
+                      {cat.detailImageUrl ? (
+                        <div className="relative aspect-[16/9] rounded-lg overflow-hidden border border-border bg-muted">
+                          <img src={cat.detailImageUrl} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="aspect-[16/9] rounded-lg border border-dashed border-border bg-muted flex items-center justify-center text-[10px] text-muted-foreground">
+                          Foto Banner Pop-up
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="sm:col-span-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm">
+                          <Upload className="size-3.5" /> Upload Foto Banner Pop-up
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = (evt) => {
+                                const dataUrl = evt.target?.result as string;
+                                if (dataUrl) {
+                                  const n = [...categories];
+                                  n[i] = { ...cat, detailImageUrl: dataUrl };
+                                  setCategories(n);
+                                  toast.success("Foto banner kategori di-upload!");
+                                }
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                          />
+                        </label>
+                      </div>
+                      <Input
+                        placeholder="URL Foto Banner Pop-up"
+                        value={cat.detailImageUrl || ""}
+                        onChange={e => { const n = [...categories]; n[i] = { ...cat, detailImageUrl: e.target.value }; setCategories(n); }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Point Keunggulan / Highlights (Pisahkan dengan Koma)</label>
+                    <Input
+                      placeholder="cth: Kurikulum 2026, Project Real-World, Code Review 1-on-1"
+                      value={Array.isArray(cat.highlights) ? cat.highlights.join(", ") : ""}
+                      onChange={e => {
+                        const arr = e.target.value.split(",").map(s => s.trim()).filter(Boolean);
+                        const n = [...categories];
+                        n[i] = { ...cat, highlights: arr };
+                        setCategories(n);
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <Button
+                variant="outline"
+                onClick={() => setCategories([
+                  ...categories,
+                  {
+                    id: uid(),
+                    name: "Kategori Baru",
+                    icon: "Sparkles",
+                    description: "Penjelasan detail kategori baru.",
+                    detailImageUrl: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1000&q=80",
+                    highlights: ["Pembelajaran Interaktif", "Mentor Praktisi Industry", "Sertifikasi Resmi"]
+                  }
+                ])}
+              >
+                <Plus className="size-4" /> Tambah Kategori Baru
+              </Button>
+            </div>
+          </Card>
+        </TabsContent>
+
         {/* ── Features ── */}
         <TabsContent value="features">
           <Card className="p-6">
-            <CardHeader className="p-0 mb-4"><CardTitle>Fitur Unggulan</CardTitle></CardHeader>
-            <div className="space-y-3">
+            <CardHeader className="p-0 mb-4">
+              <CardTitle>Fitur Unggulan & Pop-up Detail</CardTitle>
+            </CardHeader>
+            <div className="space-y-4">
               {features.map((f, i) => (
-                <div key={f.id} className="flex gap-3 items-start rounded-xl border border-border p-4">
-                  <div className="flex-1 grid gap-2 sm:grid-cols-3">
-                    <Input placeholder="Icon (lucide)" value={f.icon} onChange={e => { const n = [...features]; n[i] = { ...f, icon: e.target.value }; setFeatures(n); }} />
-                    <Input placeholder="Judul" value={f.title} onChange={e => { const n = [...features]; n[i] = { ...f, title: e.target.value }; setFeatures(n); }} />
-                    <Input placeholder="Deskripsi" value={f.description} onChange={e => { const n = [...features]; n[i] = { ...f, description: e.target.value }; setFeatures(n); }} />
+                <div key={f.id} className="rounded-xl border border-border p-4 space-y-3 bg-card">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase text-primary">Fitur #{i + 1}</span>
+                    <Button variant="ghost" size="sm" onClick={() => setFeatures(features.filter((_, j) => j !== i))}>
+                      <Trash2 className="size-4 text-destructive" />
+                    </Button>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => setFeatures(features.filter((_, j) => j !== i))}><Trash2 className="size-4 text-destructive" /></Button>
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="text-xs font-medium mb-1 block">Judul Fitur</label>
+                      <Input
+                        placeholder="cth: Kurikulum Terstruktur"
+                        value={f.title}
+                        onChange={e => { const n = [...features]; n[i] = { ...f, title: e.target.value }; setFeatures(n); }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium mb-1 block">Icon Lucide / Image URL</label>
+                      <Input
+                        placeholder="cth: GraduationCap atau https://..."
+                        value={f.icon}
+                        onChange={e => { const n = [...features]; n[i] = { ...f, icon: e.target.value }; setFeatures(n); }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Deskripsi Ringkas (Tampil di Card)</label>
+                    <Input
+                      placeholder="Deskripsi ringkas..."
+                      value={f.description}
+                      onChange={e => { const n = [...features]; n[i] = { ...f, description: e.target.value }; setFeatures(n); }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Penjelasan Detail (Pop-up Slide)</label>
+                    <Textarea
+                      rows={2}
+                      placeholder="Penjelasan lengkap saat kartu fitur diklik..."
+                      value={f.fullContent || f.description || ""}
+                      onChange={e => { const n = [...features]; n[i] = { ...f, fullContent: e.target.value }; setFeatures(n); }}
+                    />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-4 items-center pt-1">
+                    <div className="sm:col-span-1">
+                      {f.detailImageUrl ? (
+                        <div className="relative aspect-[16/9] rounded-lg overflow-hidden border border-border bg-muted">
+                          <img src={f.detailImageUrl} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="aspect-[16/9] rounded-lg border border-dashed border-border bg-muted flex items-center justify-center text-[10px] text-muted-foreground">
+                          Foto Banner Pop-up
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="sm:col-span-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm">
+                          <Upload className="size-3.5" /> Upload Foto Banner Pop-up
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = (evt) => {
+                                const dataUrl = evt.target?.result as string;
+                                if (dataUrl) {
+                                  const n = [...features];
+                                  n[i] = { ...f, detailImageUrl: dataUrl };
+                                  setFeatures(n);
+                                  toast.success("Foto banner fitur di-upload!");
+                                }
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                          />
+                        </label>
+                      </div>
+                      <Input
+                        placeholder="URL Foto Banner Pop-up"
+                        value={f.detailImageUrl || ""}
+                        onChange={e => { const n = [...features]; n[i] = { ...f, detailImageUrl: e.target.value }; setFeatures(n); }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Point Keunggulan / Highlights (Pisahkan dengan Koma)</label>
+                    <Input
+                      placeholder="cth: Materi Terupdate 2026, Studi Kasus Perusahaan, Akses Seumur Hidup"
+                      value={Array.isArray(f.highlights) ? f.highlights.join(", ") : ""}
+                      onChange={e => {
+                        const arr = e.target.value.split(",").map(s => s.trim()).filter(Boolean);
+                        const n = [...features];
+                        n[i] = { ...f, highlights: arr };
+                        setFeatures(n);
+                      }}
+                    />
+                  </div>
                 </div>
               ))}
-              <Button variant="outline" onClick={() => setFeatures([...features, { id: uid(), icon: "Star", title: "", description: "" }])}>
-                <Plus className="size-4" /> Tambah Fitur
+
+              <Button
+                variant="outline"
+                onClick={() => setFeatures([
+                  ...features,
+                  {
+                    id: uid(),
+                    icon: "Star",
+                    title: "Fitur Unggulan Baru",
+                    description: "Deskripsi ringkas fitur baru.",
+                    fullContent: "Penjelasan lengkap fitur baru saat pop-up dibuka.",
+                    detailImageUrl: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1000&q=80",
+                    highlights: ["Kemudahan Akses 24/7", "Dukungan Komunitas", "Sertifikasi Resmi"]
+                  }
+                ])}
+              >
+                <Plus className="size-4" /> Tambah Fitur Baru
               </Button>
             </div>
           </Card>

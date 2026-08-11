@@ -273,11 +273,24 @@ export interface LandingHero {
   stats: { label: string; value: string }[];
 }
 
+export interface LandingCategory {
+  id?: string;
+  name: string;
+  icon: string;   // lucide icon name or image URL
+  color?: string;
+  description?: string;
+  detailImageUrl?: string;
+  highlights?: string[];
+}
+
 export interface LandingFeature {
   id: string;
-  icon: string;   // lucide icon name
+  icon: string;   // lucide icon name or image URL
   title: string;
   description: string;
+  detailImageUrl?: string;
+  fullContent?: string;
+  highlights?: string[];
 }
 
 export interface LandingPartner {
@@ -313,7 +326,7 @@ export interface LandingContent {
   testimonials: LandingTestimonial[];
   platformStats: { label: string; value: string; icon: string }[];
   ctaSection: { headline: string; description: string; buttonText: string };
-  categories: { name: string; icon: string; color: string }[];
+  categories: LandingCategory[];
 }
 
 // ─── Store State ──────────────────────────────────────────────────────────────
@@ -448,12 +461,60 @@ const defaultLandingContent: LandingContent = {
     },
   ],
   features: [
-    { id: "f1", icon: "GraduationCap", title: "Kurikulum Terstruktur", description: "Materi disusun oleh praktisi industri dengan jalur belajar dari dasar hingga mahir." },
-    { id: "f2", icon: "Briefcase", title: "Project Nyata", description: "Bangun portfolio dengan capstone project yang relevan dengan kebutuhan industri." },
-    { id: "f3", icon: "Award", title: "Sertifikasi Terverifikasi", description: "Dapatkan kredensial digital yang diakui oleh perusahaan dan institusi mitra kami." },
-    { id: "f4", icon: "Users", title: "Talent Pool & Karier", description: "Profil terbaikmu otomatis masuk talent pool untuk direkomendasikan ke perusahaan mitra." },
-    { id: "f5", icon: "MessageSquare", title: "Komunitas Aktif", description: "Diskusi, forum, dan event bersama sesama pelajar dan mentor berpengalaman." },
-    { id: "f6", icon: "TrendingUp", title: "Analitik Progress", description: "Pantau perkembangan skill, XP, dan pencapaian belajarmu secara real-time." },
+    {
+      id: "f1",
+      icon: "GraduationCap",
+      title: "Kurikulum Terstruktur",
+      description: "Materi disusun oleh praktisi industri dengan jalur belajar dari dasar hingga mahir.",
+      detailImageUrl: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1000&q=80",
+      fullContent: "Setiap jalur pembelajaran dirancang mengikuti kurikulum standar industri IT global. Pelajar diajarkan mulai dari fundamental hingga implementasi arsitektur kompleks secara bertahap.",
+      highlights: ["Materi Terupdate 2026", "Jalur Pembelajaran Terarah", "Studi Kasus Perusahaan Tech", "Akses Seumur Hidup"]
+    },
+    {
+      id: "f2",
+      icon: "Briefcase",
+      title: "Project Nyata",
+      description: "Bangun portfolio dengan capstone project yang relevan dengan kebutuhan industri.",
+      detailImageUrl: "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=1000&q=80",
+      fullContent: "Bukan sekadar teori. Kamu akan membangun aplikasi nyata, memecahkan masalah industri sekelas startup unicorn, dan mengunggah kode ke GitHub/Portfolio.",
+      highlights: ["Real Capstone Project", "Code Review oleh Mentor Senior", "Portfolio Siap Melamar Kerja", "Grup Kolaborasi Tim"]
+    },
+    {
+      id: "f3",
+      icon: "Award",
+      title: "Sertifikasi Terverifikasi",
+      description: "Dapatkan kredensial digital yang diakui oleh perusahaan dan institusi mitra kami.",
+      detailImageUrl: "https://images.unsplash.com/photo-1567427017947-545c5f8d16ad?auto=format&fit=crop&w=1000&q=80",
+      fullContent: "Setiap sertifikat yang kamu raih memiliki QR Code dan Credential ID unik yang dapat diverifikasi secara online oleh tim HR & Rekruter perusahaan mitra.",
+      highlights: ["QR Code Verifikasi Kredensial", "Diakui 120+ Perusahaan Mitra", "Bisa Di-share ke LinkedIn", "Standardized Assessment"]
+    },
+    {
+      id: "f4",
+      icon: "Users",
+      title: "Talent Pool & Karier",
+      description: "Profil terbaikmu otomatis masuk talent pool untuk direkomendasikan ke perusahaan mitra.",
+      detailImageUrl: "https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=1000&q=80",
+      fullContent: "Lulusan dengan performa tinggi langsung direkomendasikan ke jaringan hiring partner 3ITC tanpa perlu melewati screening berkali-kali.",
+      highlights: ["Penyaluran Kerja Direct Referral", "Persiapan Interview Tech & HR", "Review CV & Profil LinkedIn", "Akses Exclusive Hiring Event"]
+    },
+    {
+      id: "f5",
+      icon: "MessageSquare",
+      title: "Komunitas Aktif",
+      description: "Diskusi, forum, dan event bersama sesama pelajar dan mentor berpengalaman.",
+      detailImageUrl: "https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&w=1000&q=80",
+      fullContent: "Bergabung bersama 85.000+ anggota komunitas teknologi. Tanya jawab masalah coding, ikuti webinar mingguan, dan bangun networking karirmu.",
+      highlights: ["Forum Diskusi Real-time", "Webinar & Event Gratis", "Networking dengan Mentor", "Study Group Berdasarkan Kategori"]
+    },
+    {
+      id: "f6",
+      icon: "TrendingUp",
+      title: "Analitik Progress",
+      description: "Pantau perkembangan skill, XP, dan pencapaian belajarmu secara real-time.",
+      detailImageUrl: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1000&q=80",
+      fullContent: "Dashboard analitik memberikan wawasan mendalam tentang penguasaan skill, kecepatan belajar, poin XP, serta badge pencapaian yang kamu raih.",
+      highlights: ["Skill Radar Chart", "XP & Gamification Badge", "Laporan Rekap Kemajuan", "Peringkat Leaderboard Student"]
+    },
   ],
   partners: [
     { id: "p1", name: "Universitas Indonesia", logoUrl: "" },

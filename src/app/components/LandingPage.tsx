@@ -451,6 +451,7 @@ export function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
+  const [activePopupItem, setActivePopupItem] = useState<{ type: 'category' | 'feature'; data: any } | null>(null);
 
   const lc = state.landingContent;
   const publishedCourses = state.courses?.filter(c => c.status === 'published').slice(0, 6) || [];
@@ -642,15 +643,19 @@ export function LandingPage() {
               <div 
                 key={i} 
                 className="group p-6 rounded-2xl bg-card border border-border/50 hover:border-primary/50 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer flex flex-col items-center text-center"
-                onClick={() => {
-                    const el = document.getElementById('kursus');
-                    el?.scrollIntoView({ behavior: 'smooth' });
-                }}
+                onClick={() => setActivePopupItem({ type: 'category', data: cat })}
               >
                 <div className="w-14 h-14 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
-                  <DynIcon name={cat.icon} className="w-7 h-7" />
+                  {cat.icon?.startsWith("data:") || cat.icon?.startsWith("http") ? (
+                    <img src={cat.icon} alt="" className="w-7 h-7 object-contain" />
+                  ) : (
+                    <DynIcon name={cat.icon} className="w-7 h-7" />
+                  )}
                 </div>
                 <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">{cat.name}</h3>
+                <span className="text-[11px] text-muted-foreground mt-1 group-hover:text-primary transition-colors flex items-center gap-1">
+                  Lihat Detail <ChevronRight className="w-3.5 h-3.5" />
+                </span>
               </div>
             ))}
           </div>
@@ -675,17 +680,28 @@ export function LandingPage() {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               {lc.features.map((feature: any, i: number) => (
                 <Section key={i} className={`delay-${(i % 3) * 100}`}>
-                  <Card className="h-full bg-card/50 backdrop-blur-sm border-border/50 hover:border-primary/30 hover:shadow-lg transition-all duration-300">
+                  <Card 
+                    className="h-full bg-card/50 backdrop-blur-sm border-border/50 hover:border-primary/50 hover:shadow-xl transition-all duration-300 cursor-pointer group hover:-translate-y-1"
+                    onClick={() => setActivePopupItem({ type: 'feature', data: feature })}
+                  >
                     <CardHeader>
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 text-primary flex items-center justify-center mb-4 shadow-inner">
-                        <DynIcon name={feature.icon} className="w-6 h-6" />
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 text-primary flex items-center justify-center mb-4 shadow-inner group-hover:scale-110 transition-transform">
+                        {feature.icon?.startsWith("data:") || feature.icon?.startsWith("http") ? (
+                          <img src={feature.icon} alt="" className="w-6 h-6 object-contain" />
+                        ) : (
+                          <DynIcon name={feature.icon} className="w-6 h-6" />
+                        )}
                       </div>
-                      <CardTitle className="text-xl">{feature.title}</CardTitle>
+                      <CardTitle className="text-xl group-hover:text-primary transition-colors">{feature.title}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <CardDescription className="text-base leading-relaxed">
                         {feature.description}
                       </CardDescription>
+                      <div className="mt-4 pt-3 border-t border-border/40 text-xs font-semibold text-primary flex items-center justify-between">
+                        <span>Pelajari Lebih Lanjut</span>
+                        <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      </div>
                     </CardContent>
                   </Card>
                 </Section>
@@ -923,6 +939,83 @@ export function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* ── Slide-up Animated Popup Modal for Category & Feature Details ── */}
+      {activePopupItem && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-300">
+          <div className="w-full max-w-2xl bg-card border border-border/80 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden transform transition-all animate-in slide-in-from-bottom-8 duration-300 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="relative p-6 bg-gradient-to-r from-primary/10 via-accent/20 to-transparent border-b border-border/50 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-primary/20 text-primary flex items-center justify-center shrink-0 shadow-inner">
+                  {activePopupItem.data.icon?.startsWith("data:") || activePopupItem.data.icon?.startsWith("http") ? (
+                    <img src={activePopupItem.data.icon} alt="" className="w-8 h-8 object-contain" />
+                  ) : (
+                    <DynIcon name={activePopupItem.data.icon || "Sparkles"} className="w-7 h-7" />
+                  )}
+                </div>
+                <div>
+                  <Badge variant="secondary" className="mb-1 text-[10px] uppercase tracking-wider font-bold">
+                    {activePopupItem.type === "category" ? "Kategori Pembelajaran" : "Fitur Unggulan 3ITC"}
+                  </Badge>
+                  <h3 className="text-xl md:text-2xl font-bold text-foreground">
+                    {activePopupItem.data.name || activePopupItem.data.title}
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={() => setActivePopupItem(null)}
+                className="rounded-full p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              {activePopupItem.data.detailImageUrl && (
+                <div className="relative aspect-video rounded-xl overflow-hidden border border-border bg-muted shadow-md">
+                  <img src={activePopupItem.data.detailImageUrl} alt="" className="w-full h-full object-cover" />
+                </div>
+              )}
+
+              <div>
+                <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Penjelasan Detail</h4>
+                <p className="text-base text-foreground leading-relaxed">
+                  {activePopupItem.data.description || activePopupItem.data.fullContent || "Detail penjelasan fitur dan kategori pembelajaran 3ITC Digital Education."}
+                </p>
+              </div>
+
+              {Array.isArray(activePopupItem.data.highlights) && activePopupItem.data.highlights.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Keunggulan & Manfaat Utama</h4>
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    {activePopupItem.data.highlights.map((h: string, idx: number) => (
+                      <div key={idx} className="flex items-start gap-2.5 p-3 rounded-xl bg-accent/30 border border-border/40 text-sm">
+                        <CheckCircle className="w-4 h-4 text-success shrink-0 mt-0.5" />
+                        <span className="font-medium text-foreground">{h}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-muted/30 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <span className="text-xs text-muted-foreground">3ITC Digital Education Platform</span>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button variant="outline" className="flex-1 sm:flex-initial" onClick={() => setActivePopupItem(null)}>
+                  Tutup
+                </Button>
+                <Button className="flex-1 sm:flex-initial" onClick={() => { setActivePopupItem(null); navigate('/login'); }}>
+                  Jelajahi Sekarang <ArrowRight className="w-4 h-4 ml-1.5" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
