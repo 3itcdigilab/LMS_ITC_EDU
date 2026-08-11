@@ -48,46 +48,23 @@ import {
   Moon,
 } from 'lucide-react';
 
-const iconMap: Record<string, React.ElementType> = {
-  GraduationCap,
-  Briefcase,
-  Award,
-  Users,
-  BookOpen,
-  Star,
-  ArrowRight,
-  Menu,
-  X,
-  CheckCircle,
-  ChevronRight,
-  Video,
-  Calendar,
-  Clock,
-  MonitorPlay,
-  Zap,
-  Shield,
-  Globe,
-  Cpu,
-  Layout,
-  PenTool,
-  Database,
-  Book,
-  Play,
-  Sparkles,
-  TrendingUp,
-  LayoutGrid,
-  MessageSquare,
-  BarChart3,
-  Building2,
-  Palette,
-  Brain,
-  Code,
-  Settings,
-};
+import * as Icons from 'lucide-react';
 
 function DynIcon({ name, className, ...props }: { name?: string; className?: string } & any) {
-  const Icon = name && iconMap[name] ? iconMap[name] : BookOpen;
-  return <Icon className={className} {...props} />;
+  if (!name) return <Icons.BookOpen className={className} {...props} />;
+  
+  if (name.startsWith("http://") || name.startsWith("https://") || name.startsWith("data:")) {
+    return <img src={name} alt="" className={cn("object-contain", className)} {...props} />;
+  }
+
+  // Format kebab-case ("shield-check") or lowercase ("code") to PascalCase ("ShieldCheck", "Code")
+  const formatted = name
+    .split(/[-_\s]+/)
+    .map(s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+    .join("");
+
+  const IconComponent = (Icons as any)[formatted] || (Icons as any)[name] || Icons.BookOpen;
+  return <IconComponent className={className} {...props} />;
 }
 
 // Fade in on scroll effect hook
