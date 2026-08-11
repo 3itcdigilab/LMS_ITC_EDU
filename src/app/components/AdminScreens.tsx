@@ -822,7 +822,23 @@ export function CourseManagement() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const nextVal = !(c as any).isFeatured;
+                            actions.updateCourse({ id: c.id, isFeatured: nextVal });
+                            toast.success(nextVal ? `Kursus "${c.title}" dijadikan Highlight di Landing Page! ⭐` : `Highlight untuk "${c.title}" dilepas.`);
+                          }}
+                          title={(c as any).isFeatured ? "Lepas dari Highlight Landing" : "Jadikan Highlight di Landing Page"}
+                          className={cn("inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all",
+                            (c as any).isFeatured
+                              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/25"
+                              : "bg-muted text-muted-foreground border-border hover:border-amber-500/40 hover:text-amber-500"
+                          )}
+                        >
+                          <Star className={cn("size-3.5", (c as any).isFeatured && "fill-current")} />
+                          {(c as any).isFeatured ? "Highlight ⭐" : "Highlight"}
+                        </button>
                         <button onClick={() => setEditingId(c.id)}
                           className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-primary transition-colors">
                           <Pencil className="size-4" />
@@ -1945,7 +1961,23 @@ export function EventManagement() {
                   <TableCell>{evt.date} ({evt.time})</TableCell>
                   <TableCell>{evt.registrations || 0} / {evt.seats} Kursi</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => {
+                          const nextVal = !evt.isFeatured;
+                          actions.updateEvent({ id: evt.id, isFeatured: nextVal });
+                          toast.success(nextVal ? `Event "${evt.title}" dijadikan Highlight di Landing Page! ⭐` : `Highlight untuk "${evt.title}" dilepas.`);
+                        }}
+                        title={evt.isFeatured ? "Lepas dari Highlight Landing" : "Jadikan Highlight di Landing Page"}
+                        className={cn("inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all mr-1",
+                          evt.isFeatured
+                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/25"
+                            : "bg-muted text-muted-foreground border-border hover:border-amber-500/40 hover:text-amber-500"
+                        )}
+                      >
+                        <Star className={cn("size-3.5", evt.isFeatured && "fill-current")} />
+                        {evt.isFeatured ? "Highlight ⭐" : "Highlight"}
+                      </button>
                       <Button
                         variant="ghost"
                         size="sm"

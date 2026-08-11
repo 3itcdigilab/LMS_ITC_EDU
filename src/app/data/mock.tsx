@@ -38,6 +38,7 @@ export interface Course {
   price: string;
   image: string;
   summary: string;
+  isFeatured?: boolean;
 }
 
 export const courses: Course[] = [];

@@ -430,9 +430,13 @@ export function LandingPage() {
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [activePopupItem, setActivePopupItem] = useState<{ type: 'category' | 'feature'; data: any } | null>(null);
 
-  const lc = state.landingContent;
-  const publishedCourses = state.courses?.filter(c => c.status === 'published').slice(0, 6) || [];
-  const upcomingEvents = state.events?.slice(0, 3) || [];
+  const allPublished = state.courses?.filter(c => c.status === 'published') || [];
+  const explicitFeaturedCourses = allPublished.filter(c => (c as any).isFeatured);
+  const publishedCourses = (explicitFeaturedCourses.length > 0 ? explicitFeaturedCourses : allPublished).slice(0, 6);
+
+  const allEvents = state.events || [];
+  const explicitFeaturedEvents = allEvents.filter(e => e.isFeatured);
+  const upcomingEvents = (explicitFeaturedEvents.length > 0 ? explicitFeaturedEvents : allEvents).slice(0, 3);
 
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === "undefined") return true;

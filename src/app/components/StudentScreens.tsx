@@ -458,6 +458,9 @@ function LessonTypeIcon({ type }: { type: string }) {
 
 function CourseDetail({ course, onBack, onNavigate }: { course: Course; onBack: () => void; onNavigate: (k: string) => void }) {
   const { state, actions } = useStore();
+  const [showWriteReview, setShowWriteReview] = useState(false);
+  const [newRating, setNewRating] = useState(5);
+  const [newComment, setNewComment] = useState("");
   const totalLessons = course.curriculum?.reduce((a, m) => a + (m.lessons?.length ?? 0), 0) ?? 0;
   
   const currentUserKey = (state.profile?.email || `${state.profile?.firstName || ""} ${state.profile?.lastName || ""}`.trim() || "student").toLowerCase();

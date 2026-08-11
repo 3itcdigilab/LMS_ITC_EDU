@@ -243,6 +243,7 @@ export interface AppEvent {
   meetingUrl?: string; // Link Zoom / GMeet
   gformUrl?: string;   // Link GForm Pendaftaran
   thankYouMessage?: string; // Pesan kustom setelah mendaftar
+  isFeatured?: boolean; // Highlight di Landing Page
 }
 
 export interface PortfolioProject {
