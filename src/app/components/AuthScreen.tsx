@@ -101,28 +101,14 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
     }
 
     try {
-      // 1. First check default accounts (by email or username)
-      const defaultAccKey = Object.keys(DEFAULT_ACCOUNTS).find(
-        k => k.toLowerCase() === cleanInput || k.split('@')[0].toLowerCase() === cleanInput
-      );
-      if (defaultAccKey) {
-        const acc = DEFAULT_ACCOUNTS[defaultAccKey];
-        if (acc.pass === cleanPass || acc.pass.toLowerCase() === cleanPass.toLowerCase()) {
-          syncUserProfile(acc.name, acc.institution, acc.role);
-          onLogin(acc.role);
-          return;
-        } else {
-          setErrorMsg("Password yang Anda masukkan salah. Silakan periksa kembali!");
-          return;
-        }
-      }
-
-      // 2. Check dynamic users in Store (by email or full name)
+      // 1. Search dynamic users in Store (by email, full name, or username)
       let foundUser = state.users.find(
-        u => (u?.email || "").toLowerCase() === cleanInput || (u?.name || "").toLowerCase() === cleanInput
+        u => (u?.email || "").toLowerCase() === cleanInput ||
+             (u?.name || "").toLowerCase() === cleanInput ||
+             (u?.email || "").split('@')[0].toLowerCase() === cleanInput
       );
 
-      // 3. Direct Query to Firestore DB if not in memory state yet
+      // 2. Direct Query to Firestore DB if not in memory state yet
       if (!foundUser) {
         try {
           const snapshot = await getDocs(collection(db, "profiles"));
@@ -131,6 +117,7 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
               const p = docSnap.data();
               return (p.email || "").toLowerCase() === cleanInput ||
                      (p.name || "").toLowerCase() === cleanInput ||
+                     (p.email || "").split('@')[0].toLowerCase() === cleanInput ||
                      `${p.first_name || ""} ${p.last_name || ""}`.trim().toLowerCase() === cleanInput;
             });
             if (matchedDoc) {
@@ -153,19 +140,19 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
         }
       }
 
-      // 4. Validate found user and verify password strictly
+      // 3. Validate found user from Store / Firestore and verify password strictly
       if (foundUser) {
         if (foundUser.status === "Suspended") {
           setErrorMsg("Akun Anda sedang dinonaktifkan (Suspended). Hubungi Admin.");
           return;
         }
         
-        // Strict password verification against stored password or default password
+        // Strict password verification against stored password
         const expectedPassword = (foundUser.password && foundUser.password.trim() !== "")
           ? foundUser.password.trim()
           : "gaadapasswordnya";
 
-        if (cleanPass !== expectedPassword && cleanPass.toLowerCase() !== expectedPassword.toLowerCase()) {
+        if (cleanPass !== expectedPassword) {
           setErrorMsg("Password yang Anda masukkan salah. Silakan periksa kembali!");
           return;
         }
@@ -174,6 +161,22 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
         syncUserProfile(foundUser.name, foundUser.institution, userRole);
         onLogin(userRole);
         return;
+      }
+
+      // 4. Fallback for unseeded default accounts only if not found in DB/Store
+      const defaultAccKey = Object.keys(DEFAULT_ACCOUNTS).find(
+        k => k.toLowerCase() === cleanInput || k.split('@')[0].toLowerCase() === cleanInput
+      );
+      if (defaultAccKey) {
+        const acc = DEFAULT_ACCOUNTS[defaultAccKey];
+        if (acc.pass === cleanPass) {
+          syncUserProfile(acc.name, acc.institution, acc.role);
+          onLogin(acc.role);
+          return;
+        } else {
+          setErrorMsg("Password yang Anda masukkan salah. Silakan periksa kembali!");
+          return;
+        }
       }
 
       setErrorMsg("User / Email atau password salah. Akun tidak ditemukan!");

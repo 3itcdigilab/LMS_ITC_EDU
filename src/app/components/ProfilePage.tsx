@@ -649,11 +649,55 @@ function PrivacyTab({ profile, onSave }: { profile: UserProfile; onSave: (p: Par
 
 /* ── Tab: Account & Security ──────────────────────────────────────────────── */
 function AccountTab({ onLogout }: { onLogout: () => void }) {
-  const [email,      setEmail]      = useState("");
+  const { state, actions } = useStore();
+  const [email,      setEmail]      = useState(state.profile?.email || "");
   const [pass,       setPass]       = useState("");
   const [confirm,    setConfirm]    = useState("");
   const [twofa,      setTwofa]      = useState(false);
   const [loginAlert, setLoginAlert] = useState(true);
+
+  const handleUpdateCredentials = () => {
+    if (pass && pass.length < 6) {
+      toast.error("Password baru minimal 6 karakter!");
+      return;
+    }
+    if (pass && pass !== confirm) {
+      toast.error("Password dan konfirmasi password tidak cocok!");
+      return;
+    }
+
+    const currentEmail = state.profile?.email || "";
+    const existingUser = state.users.find(
+      u => (u.email || "").toLowerCase() === currentEmail.toLowerCase() ||
+           u.id === state.profile?.id ||
+           (u.email || "").toLowerCase() === email.toLowerCase()
+    );
+
+    const targetId = existingUser?.id || `user-${(email || currentEmail || "user").replace(/[^a-zA-Z0-9]/g, "-")}`;
+    const targetName = existingUser?.name || `${state.profile?.firstName || "User"} ${state.profile?.lastName || ""}`.trim();
+    const updatedPass = pass ? pass.trim() : (existingUser?.password || "gaadapasswordnya");
+    const updatedEmail = email.trim() || currentEmail || "user@3itcedu.id";
+
+    // 1. Update user account in Store & Firestore
+    actions.updateUser({
+      id: targetId,
+      name: targetName,
+      email: updatedEmail,
+      password: updatedPass,
+      institution: state.profile?.institution || "3ITC Digital Education",
+      role: existingUser?.role || "Student",
+      status: existingUser?.status || "Active",
+    });
+
+    // 2. Update current active profile
+    actions.updateProfile({
+      email: updatedEmail,
+    });
+
+    toast.success("Kredensial & Password baru berhasil diperbarui!");
+    setPass("");
+    setConfirm("");
+  };
 
   return (
     <div className="space-y-6">
@@ -679,11 +723,7 @@ function AccountTab({ onLogout }: { onLogout: () => void }) {
               </div>
             </Field>
           </div>
-          <Button onClick={() => {
-            if (pass && pass !== confirm) { toast.error("Password tidak cocok!"); return; }
-            toast.success("Kredensial berhasil diperbarui!");
-            setPass(""); setConfirm("");
-          }}><Save className="size-4" /> Perbarui kredensial</Button>
+          <Button onClick={handleUpdateCredentials}><Save className="size-4" /> Perbarui kredensial</Button>
         </Card>
       </Section>
 
