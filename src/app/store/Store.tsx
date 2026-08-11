@@ -477,6 +477,20 @@ const defaultLandingContent: LandingContent = {
   ],
 };
 
+const getInitialLandingContent = (): LandingContent => {
+  if (typeof window === "undefined") return defaultLandingContent;
+  try {
+    const saved = localStorage.getItem("3itc_landing_cache");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.hero) {
+        return { ...defaultLandingContent, ...parsed };
+      }
+    }
+  } catch (_) {}
+  return defaultLandingContent;
+};
+
 const defaultInstitutions: Institution[] = [
   {
     id: "inst-3itc",
@@ -516,7 +530,7 @@ const initialState: StoreState = {
   events: defaultEvents,
   portfolioProjects: [],
   certificates: [],
-  landingContent: defaultLandingContent,
+  landingContent: getInitialLandingContent(),
   badges: [],
   feedPosts: [],
   friendConnections: [],
@@ -1428,9 +1442,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     }, err => console.warn("Firestore forumThreads listener:", err));
 
+    const unsubLanding = onSnapshot(doc(db, "settings", "landing"), (snap) => {
+      if (snap.exists()) {
+        const landingContent = snap.data() as LandingContent;
+        dispatch({ type: "HYDRATE", payload: { landingContent } });
+        cacheSet("3itc_landing_cache", landingContent);
+      }
+    }, err => console.warn("Firestore landing listener:", err));
+
     return () => {
       unsubProfiles(); unsubInstitutions(); unsubCourses();
-      unsubEnrollments(); unsubReviews(); unsubFeed(); unsubForum();
+      unsubEnrollments(); unsubReviews(); unsubFeed(); unsubForum(); unsubLanding();
     };
   }, []);
 
@@ -1597,7 +1619,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     updatePortfolio: p => dispatch({ type: "UPDATE_PORTFOLIO", payload: p }),
     deletePortfolio: id => dispatch({ type: "DELETE_PORTFOLIO", payload: id }),
     addCertificate: d => dispatch({ type: "ADD_CERTIFICATE", payload: d }),
-    updateLanding: p => dispatch({ type: "UPDATE_LANDING", payload: p }),
+    updateLanding: p => {
+      dispatch({ type: "UPDATE_LANDING", payload: p });
+      const newLanding = { ...state.landingContent, ...p };
+      fsSet("settings", "landing", newLanding);
+    },
 
     // ── Feed Posts ──
     addFeedPost: d => {
