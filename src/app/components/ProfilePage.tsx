@@ -105,15 +105,44 @@ function BasicInfoTab({ profile, onSave }: { profile: UserProfile; onSave: (p: P
     });
   }, [profile]);
 
+function compressImage(dataUrl: string, maxWidth: number, maxHeight: number, quality = 0.8): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth || height > maxHeight) {
+        const ratio = Math.min(maxWidth / width, maxHeight / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      } else {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
   const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (evt) => {
-      const result = evt.target?.result as string;
-      set("avatarUrl", result);
-      onSave({ avatarUrl: result });
-      toast.success("Foto profil berhasil diunggah!");
+    reader.onload = async (evt) => {
+      const rawResult = evt.target?.result as string;
+      const compressed = await compressImage(rawResult, 300, 300, 0.8);
+      set("avatarUrl", compressed);
+      onSave({ avatarUrl: compressed });
+      toast.success("Foto profil berhasil diunggah dan disimpan!");
     };
     reader.readAsDataURL(file);
   };
@@ -122,11 +151,12 @@ function BasicInfoTab({ profile, onSave }: { profile: UserProfile; onSave: (p: P
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (evt) => {
-      const result = evt.target?.result as string;
-      set("bannerUrl", result);
-      onSave({ bannerUrl: result });
-      toast.success("Banner profil berhasil diunggah!");
+    reader.onload = async (evt) => {
+      const rawResult = evt.target?.result as string;
+      const compressed = await compressImage(rawResult, 1000, 400, 0.75);
+      set("bannerUrl", compressed);
+      onSave({ bannerUrl: compressed });
+      toast.success("Banner profil berhasil diunggah dan disimpan!");
     };
     reader.readAsDataURL(file);
   };

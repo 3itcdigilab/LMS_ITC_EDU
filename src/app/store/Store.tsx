@@ -1608,8 +1608,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     deleteNotification: notifId => dispatch({ type: "DELETE_NOTIFICATION", payload: notifId }),
     clearAllNotifications: userKey => dispatch({ type: "CLEAR_ALL_NOTIFICATIONS", payload: userKey }),
     setActiveProfileByName: (name, defaultRole, institution, email) => dispatch({ type: "SET_ACTIVE_PROFILE_BY_NAME", payload: { name, defaultRole, institution, email } }),
-    updateFeedPost: p => dispatch({ type: "UPDATE_FEED_POST", payload: p }),
-    deleteFeedPost: id => dispatch({ type: "DELETE_FEED_POST", payload: id }),
+    updateFeedPost: p => {
+      dispatch({ type: "UPDATE_FEED_POST", payload: p });
+      fsSet("feedPosts", p.id, p);
+    },
+    deleteFeedPost: id => {
+      dispatch({ type: "DELETE_FEED_POST", payload: id });
+      fsDel("feedPosts", id);
+    },
     addBadge: d => dispatch({ type: "ADD_BADGE", payload: d }),
     updateBadge: p => dispatch({ type: "UPDATE_BADGE", payload: p }),
     deleteBadge: id => dispatch({ type: "DELETE_BADGE", payload: id }),
