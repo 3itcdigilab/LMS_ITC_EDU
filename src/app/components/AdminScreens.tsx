@@ -805,20 +805,194 @@ export function CourseManagement() {
 
 /* ─── Assessment Management ──────────────────────────────────────────────── */
 export function AssessmentManagement() {
+  const { state, actions } = useStore();
+  const assessments = state.assessments || [];
+
+  const [showModal, setShowModal] = useState(false);
+  const [editingAss, setEditingAss] = useState<any | null>(null);
+  const [deletingAss, setDeletingAss] = useState<{ id: string; title: string } | null>(null);
+
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState<"Quiz" | "Assignment" | "Project" | "Peer Review">("Quiz");
+  const [courseId, setCourseId] = useState("");
+  const [passingScore, setPassingScore] = useState(75);
+  const [dueDate, setDueDate] = useState("");
+
+  const handleOpenCreate = () => {
+    setEditingAss(null);
+    setTitle("");
+    setType("Quiz");
+    setCourseId(state.courses[0]?.id || "");
+    setPassingScore(75);
+    setDueDate("");
+    setShowModal(true);
+  };
+
+  const handleOpenEdit = (ass: any) => {
+    setEditingAss(ass);
+    setTitle(ass.title || "");
+    setType(ass.type || "Quiz");
+    setCourseId(ass.courseId || "");
+    setPassingScore(ass.passingScore || 75);
+    setDueDate(ass.dueDate || "");
+    setShowModal(true);
+  };
+
+  const handleSave = () => {
+    if (!title.trim()) {
+      toast.error("Judul asesmen wajib diisi.");
+      return;
+    }
+    const selectedCourse = state.courses.find(c => c.id === courseId);
+    const payload = {
+      title: title.trim(),
+      type,
+      courseId,
+      courseTitle: selectedCourse?.title || "Umum",
+      passingScore: Number(passingScore),
+      dueDate: dueDate || undefined,
+    };
+
+    if (editingAss) {
+      actions.updateAssessment({ id: editingAss.id, ...payload });
+      toast.success("Asesmen berhasil diperbarui!");
+    } else {
+      actions.addAssessment(payload);
+      toast.success("Asesmen baru berhasil ditambahkan!");
+    }
+    setShowModal(false);
+  };
+
   return (
     <div>
-      <PageHeader title="Manajemen Asesmen" subtitle="Kuis, tugas, project & peer review" actions={<Button><Plus className="size-4" /> Asesmen baru</Button>} />
+      <ConfirmDeleteModal
+        isOpen={!!deletingAss}
+        title="Hapus Asesmen"
+        itemName={deletingAss?.title}
+        description="Apakah Anda yakin ingin menghapus asesmen ini?"
+        onConfirm={() => {
+          if (deletingAss) {
+            actions.deleteAssessment(deletingAss.id);
+            toast.success(`Asesmen "${deletingAss.title}" berhasil dihapus.`);
+            setDeletingAss(null);
+          }
+        }}
+        onClose={() => setDeletingAss(null)}
+      />
+
+      <PageHeader
+        title="Manajemen Asesmen"
+        subtitle="Kuis, tugas, project & peer review"
+        actions={<Button onClick={handleOpenCreate}><Plus className="size-4" /> Asesmen baru</Button>}
+      />
+
       <div className="grid gap-4 sm:grid-cols-4">
-        <StatCard label="Total asesmen" value="0" icon={<ClipboardCheck className="size-5" />} />
-        <StatCard label="Rata-rata skor" value="0%" icon={<TrendingUp className="size-5" />} tone="success" />
+        <StatCard label="Total asesmen" value={String(assessments.length)} icon={<ClipboardCheck className="size-5" />} />
+        <StatCard label="Rata-rata skor KKM" value="75%" icon={<TrendingUp className="size-5" />} tone="success" />
         <StatCard label="Menunggu nilai" value="0" icon={<CheckCircle2 className="size-5" />} tone="warning" />
-        <StatCard label="Peer review" value="0" icon={<Users className="size-5" />} tone="neutral" />
+        <StatCard label="Peer review" value={String(assessments.filter(a => a.type === "Peer Review").length)} icon={<Users className="size-5" />} tone="neutral" />
       </div>
+
       <div className="mt-6">
-        <EmptyState icon={<ClipboardCheck className="size-7" />} title="Belum ada asesmen dibuat"
-          description="Buat kuis, tugas, atau project untuk mengevaluasi pelajar."
-          action={<Button><Plus className="size-4" /> Buat asesmen</Button>} />
+        {assessments.length === 0 ? (
+          <EmptyState
+            icon={<ClipboardCheck className="size-7" />}
+            title="Belum ada asesmen dibuat"
+            description="Buat kuis, tugas, atau project untuk mengevaluasi pelajar."
+            action={<Button onClick={handleOpenCreate}><Plus className="size-4" /> Buat asesmen</Button>}
+          />
+        ) : (
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Judul Asesmen</TableHead>
+                  <TableHead>Tipe</TableHead>
+                  <TableHead>Kursus</TableHead>
+                  <TableHead>KKM Score</TableHead>
+                  <TableHead>Tenggat</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {assessments.map(ass => (
+                  <TableRow key={ass.id}>
+                    <TableCell className="font-medium">{ass.title}</TableCell>
+                    <TableCell><Badge variant="secondary">{ass.type}</Badge></TableCell>
+                    <TableCell className="text-muted-foreground">{ass.courseTitle || "Umum"}</TableCell>
+                    <TableCell><Badge variant="outline">{ass.passingScore || 75} Poin</Badge></TableCell>
+                    <TableCell className="text-muted-foreground">{ass.dueDate || "Tidak ada"}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => handleOpenEdit(ass)} className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-primary transition-colors">
+                          <Pencil className="size-4" />
+                        </button>
+                        <button onClick={() => setDeletingAss({ id: ass.id, title: ass.title })} className="rounded-lg p-1.5 text-muted-foreground hover:text-destructive transition-colors">
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        )}
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-md p-6 bg-card space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold">{editingAss ? "Edit Asesmen" : "Tambah Asesmen Baru"}</h3>
+              <Button variant="ghost" size="sm" onClick={() => setShowModal(false)}><X className="size-4" /></Button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Judul Asesmen</label>
+                <Input placeholder="cth: Kuis Dasar TypeScript Module 1" value={title} onChange={e => setTitle(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1 block">Tipe Asesmen</label>
+                <select className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={type} onChange={e => setType(e.target.value as any)}>
+                  <option value="Quiz">Quiz (Kuis)</option>
+                  <option value="Assignment">Assignment (Tugas)</option>
+                  <option value="Project">Project Akhir</option>
+                  <option value="Peer Review">Peer Review</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1 block">Terkait Kursus</label>
+                <select className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={courseId} onChange={e => setCourseId(e.target.value)}>
+                  <option value="">Umum (Semua Kursus)</option>
+                  {state.courses.map(c => (
+                    <option key={c.id} value={c.id}>{c.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Nilai KKM (Passing)</label>
+                  <Input type="number" min={0} max={100} value={passingScore} onChange={e => setPassingScore(Number(e.target.value))} />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Tenggat Waktu</label>
+                  <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t">
+              <Button variant="outline" onClick={() => setShowModal(false)}>Batal</Button>
+              <Button onClick={handleSave}>{editingAss ? "Simpan Perubahan" : "Buat Asesmen"}</Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

@@ -340,6 +340,19 @@ export interface UserNotificationItem {
   createdAt: string;
 }
 
+export interface AppAssessment {
+  id: string;
+  title: string;
+  type: "Quiz" | "Assignment" | "Project" | "Peer Review";
+  courseId?: string;
+  courseTitle?: string;
+  totalQuestions?: number;
+  passingScore?: number;
+  dueDate?: string;
+  submissionsCount?: number;
+  createdAt: string;
+}
+
 export interface StoreState {
   profile: UserProfile;
   courses: Course[];
@@ -358,6 +371,7 @@ export interface StoreState {
   userProfilesMap?: Record<string, Partial<UserProfile>>;
   badges?: AppBadge[];
   reviews?: CourseReview[];
+  assessments?: AppAssessment[];
 }
 
 const defaultProfile: UserProfile = {
@@ -621,9 +635,9 @@ type Action =
   | { type: "DELETE_BADGE";      payload: string }
   | { type: "AWARD_USER_BADGE";  payload: { badgeId: string; targetUserKey: string } }
   | { type: "SET_FEATURED_BADGE"; payload: { badgeId: string } }
-  | { type: "ADD_NOTIFICATION";  payload: Omit<UserNotificationItem, "id" | "createdAt"> }
-  | { type: "ADD_FORUM_REPLY";   payload: { threadId: string; reply: Omit<ForumReply, "id" | "createdAt"> } }
-  | { type: "UPDATE_FORUM_THREAD"; payload: { id: string } & Partial<ForumThread> }
+  | { type: "ADD_ASSESSMENT";     payload: Omit<AppAssessment, "id" | "createdAt"> }
+  | { type: "UPDATE_ASSESSMENT";  payload: { id: string } & Partial<AppAssessment> }
+  | { type: "DELETE_ASSESSMENT";  payload: string }
   | { type: "HYDRATE";             payload: StoreState };
 
 function uid() { return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
@@ -671,6 +685,9 @@ function reducer(state: StoreState, action: Action): StoreState {
       }
       if (Array.isArray(payload.events)) merged.events = payload.events;
       if (Array.isArray(payload.badges)) merged.badges = payload.badges;
+      if (Array.isArray(payload.assessments)) merged.assessments = payload.assessments;
+      if (Array.isArray(payload.portfolioProjects)) merged.portfolioProjects = payload.portfolioProjects;
+      if (Array.isArray(payload.certificates)) merged.certificates = payload.certificates;
       if (Array.isArray(payload.feedPosts)) merged.feedPosts = payload.feedPosts;
       if (Array.isArray(payload.forumThreads)) merged.forumThreads = payload.forumThreads;
       if (Array.isArray(payload.reviews)) merged.reviews = payload.reviews;
@@ -1178,6 +1195,12 @@ function reducer(state: StoreState, action: Action): StoreState {
       return { ...state, badges: (state.badges || []).map(b => b.id === action.payload.id ? { ...b, ...action.payload } : b) };
     case "DELETE_BADGE":
       return { ...state, badges: (state.badges || []).filter(b => b.id !== action.payload) };
+    case "ADD_ASSESSMENT":
+      return { ...state, assessments: [...(state.assessments || []), { ...action.payload, id: uid(), createdAt: now() }] };
+    case "UPDATE_ASSESSMENT":
+      return { ...state, assessments: (state.assessments || []).map(a => a.id === action.payload.id ? { ...a, ...action.payload } : a) };
+    case "DELETE_ASSESSMENT":
+      return { ...state, assessments: (state.assessments || []).filter(a => a.id !== action.payload) };
     case "AWARD_USER_BADGE": {
       const { badgeId, targetUserKey } = action.payload;
       const keyLower = (targetUserKey || "").toLowerCase();
@@ -1292,8 +1315,10 @@ interface StoreContextType {
     deleteBadge:       (id: string) => void;
     awardUserBadge:    (badgeId: string, targetUserKey: string) => void;
     setFeaturedBadge:  (badgeId: string) => void;
-    addNotification:   (data: Omit<UserNotificationItem, "id" | "createdAt">) => void;
-    addCourseReview:     (data: { courseId: string; userName: string; userAvatar?: string; userRole?: string; rating: number; comment: string }) => void;
+    addAssessment:     (data: Omit<AppAssessment, "id" | "createdAt">) => void;
+    updateAssessment:  (patch: { id: string } & Partial<AppAssessment>) => void;
+    deleteAssessment:  (id: string) => void;
+    addCourseReview:   (data: { courseId: string; userName: string; userAvatar?: string; userRole?: string; rating: number; comment: string }) => void;
     addForumReply:     (threadId: string, reply: Omit<ForumReply, "id" | "createdAt">) => void;
     updateForumThread: (patch: { id: string } & Partial<ForumThread>) => void;
   };
@@ -1459,6 +1484,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       cacheSet("3itc_events_cache", events);
     }, err => console.warn("Firestore events listener:", err));
 
+    const unsubBadges = onSnapshot(collection(db, "badges"), (snap) => {
+      const badges = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+      dispatch({ type: "HYDRATE", payload: { badges } });
+      cacheSet("3itc_badges_cache", badges);
+    }, err => console.warn("Firestore badges listener:", err));
+
+    const unsubAssessments = onSnapshot(collection(db, "assessments"), (snap) => {
+      const assessments = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+      dispatch({ type: "HYDRATE", payload: { assessments } });
+      cacheSet("3itc_assessments_cache", assessments);
+    }, err => console.warn("Firestore assessments listener:", err));
+
+    const unsubPortfolio = onSnapshot(collection(db, "portfolioProjects"), (snap) => {
+      const portfolioProjects = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+      dispatch({ type: "HYDRATE", payload: { portfolioProjects } });
+      cacheSet("3itc_portfolio_cache", portfolioProjects);
+    }, err => console.warn("Firestore portfolioProjects listener:", err));
+
+    const unsubCertificates = onSnapshot(collection(db, "certificates"), (snap) => {
+      const certificates = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+      dispatch({ type: "HYDRATE", payload: { certificates } });
+      cacheSet("3itc_certs_cache", certificates);
+    }, err => console.warn("Firestore certificates listener:", err));
+
     const unsubLanding = onSnapshot(doc(db, "settings", "landing"), (snap) => {
       if (snap.exists()) {
         const landingContent = snap.data() as LandingContent;
@@ -1469,7 +1518,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     return () => {
       unsubProfiles(); unsubInstitutions(); unsubCourses();
-      unsubEnrollments(); unsubReviews(); unsubFeed(); unsubForum(); unsubEvents(); unsubLanding();
+      unsubEnrollments(); unsubReviews(); unsubFeed(); unsubForum();
+      unsubEvents(); unsubBadges(); unsubAssessments(); unsubPortfolio();
+      unsubCertificates(); unsubLanding();
     };
   }, []);
 
@@ -1662,15 +1713,67 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       fsSet("events", id, { registrations: currentReg });
     },
 
-    // ── Portfolio & Certificates (local only) ──
-    addPortfolio: d => dispatch({ type: "ADD_PORTFOLIO", payload: d }),
-    updatePortfolio: p => dispatch({ type: "UPDATE_PORTFOLIO", payload: p }),
-    deletePortfolio: id => dispatch({ type: "DELETE_PORTFOLIO", payload: id }),
-    addCertificate: d => dispatch({ type: "ADD_CERTIFICATE", payload: d }),
+    // ── Portfolio & Certificates ──
+    addPortfolio: d => {
+      const pId = `port-${Date.now()}`;
+      const newPort = { id: pId, ...d, createdAt: new Date().toISOString() };
+      dispatch({ type: "ADD_PORTFOLIO", payload: newPort });
+      fsSet("portfolioProjects", pId, newPort);
+    },
+    updatePortfolio: p => {
+      dispatch({ type: "UPDATE_PORTFOLIO", payload: p });
+      fsSet("portfolioProjects", p.id, p);
+    },
+    deletePortfolio: id => {
+      dispatch({ type: "DELETE_PORTFOLIO", payload: id });
+      fsDel("portfolioProjects", id);
+    },
+    addCertificate: d => {
+      const cId = `cert-${Date.now()}`;
+      const newCert = { id: cId, ...d, issuedAt: new Date().toISOString() };
+      dispatch({ type: "ADD_CERTIFICATE", payload: newCert });
+      fsSet("certificates", cId, newCert);
+    },
     updateLanding: p => {
       dispatch({ type: "UPDATE_LANDING", payload: p });
       const newLanding = { ...state.landingContent, ...p };
       fsSet("settings", "landing", newLanding);
+    },
+
+    // ── Badges ──
+    addBadge: d => {
+      const bId = `badge-${Date.now()}`;
+      const newBadge = { id: bId, ...d, createdAt: new Date().toISOString() };
+      dispatch({ type: "ADD_BADGE", payload: newBadge });
+      fsSet("badges", bId, newBadge);
+    },
+    updateBadge: p => {
+      dispatch({ type: "UPDATE_BADGE", payload: p });
+      fsSet("badges", p.id, p);
+    },
+    deleteBadge: id => {
+      dispatch({ type: "DELETE_BADGE", payload: id });
+      fsDel("badges", id);
+    },
+    awardUserBadge: (badgeId, targetUserKey) => {
+      dispatch({ type: "AWARD_USER_BADGE", payload: { badgeId, targetUserKey } });
+    },
+    setFeaturedBadge: badgeId => dispatch({ type: "SET_FEATURED_BADGE", payload: { badgeId } }),
+
+    // ── Assessments ──
+    addAssessment: d => {
+      const aId = `ass-${Date.now()}`;
+      const newAss = { id: aId, ...d, submissionsCount: d.submissionsCount || 0, createdAt: new Date().toISOString() };
+      dispatch({ type: "ADD_ASSESSMENT", payload: newAss });
+      fsSet("assessments", aId, newAss);
+    },
+    updateAssessment: p => {
+      dispatch({ type: "UPDATE_ASSESSMENT", payload: p });
+      fsSet("assessments", p.id, p);
+    },
+    deleteAssessment: id => {
+      dispatch({ type: "DELETE_ASSESSMENT", payload: id });
+      fsDel("assessments", id);
     },
 
     // ── Feed Posts ──
@@ -1713,11 +1816,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "DELETE_FEED_POST", payload: id });
       fsDel("feedPosts", id);
     },
-    addBadge: d => dispatch({ type: "ADD_BADGE", payload: d }),
-    updateBadge: p => dispatch({ type: "UPDATE_BADGE", payload: p }),
-    deleteBadge: id => dispatch({ type: "DELETE_BADGE", payload: id }),
-    awardUserBadge: (badgeId, targetUserKey) => dispatch({ type: "AWARD_USER_BADGE", payload: { badgeId, targetUserKey } }),
-    setFeaturedBadge: badgeId => dispatch({ type: "SET_FEATURED_BADGE", payload: { badgeId } }),
     addNotification: d => dispatch({ type: "ADD_NOTIFICATION", payload: d }),
     addForumReply: (threadId, reply) => dispatch({ type: "ADD_FORUM_REPLY", payload: { threadId, reply } }),
     updateForumThread: p => dispatch({ type: "UPDATE_FORUM_THREAD", payload: p }),
