@@ -74,8 +74,11 @@ function BasicInfoTab({ profile, onSave }: { profile: UserProfile; onSave: (p: P
   const photoInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
+  const cleanLastName = (l: string) => l ? l.replace(/\s*\((Student|Mentor|Admin|Super Admin)\)/gi, "").trim() : "";
+
   const [form, setForm] = useState({
-    firstName: profile.firstName, lastName: profile.lastName,
+    firstName: profile.firstName,
+    lastName: cleanLastName(profile.lastName),
     headline: profile.headline, bio: profile.bio,
     phone: profile.phone, city: profile.city, dateOfBirth: profile.dateOfBirth,
     institution: profile.institution, major: profile.major,
@@ -89,7 +92,8 @@ function BasicInfoTab({ profile, onSave }: { profile: UserProfile; onSave: (p: P
 
   useEffect(() => {
     setForm({
-      firstName: profile.firstName, lastName: profile.lastName,
+      firstName: profile.firstName,
+      lastName: cleanLastName(profile.lastName),
       headline: profile.headline, bio: profile.bio,
       phone: profile.phone, city: profile.city, dateOfBirth: profile.dateOfBirth,
       institution: profile.institution, major: profile.major,
@@ -602,6 +606,17 @@ function PrivacyTab({ profile, onSave }: { profile: UserProfile; onSave: (p: Par
     { key: "showPortfolio"     as const, label: "Tampilkan portfolio di profil",    desc: "Project dan karya terlihat oleh pengunjung" },
   ];
 
+  const handleExportData = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(profile, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `3itc_profile_${profile.firstName || "user"}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    toast.success("Data profil berhasil diekspor ke JSON!");
+  };
+
   return (
     <div className="space-y-6">
       <Section title="Visibilitas profil" description="Atur siapa yang bisa melihat profilmu">
@@ -622,20 +637,24 @@ function PrivacyTab({ profile, onSave }: { profile: UserProfile; onSave: (p: Par
       <Separator />
       <Section title="Data & privasi">
         <div className="space-y-3">
-          {([
-            ["Unduh data saya",    "Ekspor semua data akun dalam format JSON", ExternalLink],
-            ["Riwayat aktivitas",  "Lihat log aktivitas di platform",          ChevronRight],
-          ] as const).map(([label, desc, Icon]) => (
-            <Card key={label} className="cursor-pointer p-4 hover:shadow-sm transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-secondary">{label}</p>
-                  <p className="text-xs text-muted-foreground">{desc}</p>
-                </div>
-                <Icon className="size-4 text-muted-foreground" />
+          <Card onClick={handleExportData} className="cursor-pointer p-4 hover:shadow-sm transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-secondary">Unduh data saya</p>
+                <p className="text-xs text-muted-foreground">Ekspor semua data akun dalam format JSON</p>
               </div>
-            </Card>
-          ))}
+              <ExternalLink className="size-4 text-muted-foreground" />
+            </div>
+          </Card>
+          <Card onClick={() => toast.info("Semua log aktivitas Anda tercatat aman.")} className="cursor-pointer p-4 hover:shadow-sm transition-shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-secondary">Riwayat aktivitas</p>
+                <p className="text-xs text-muted-foreground">Lihat log aktivitas di platform</p>
+              </div>
+              <ChevronRight className="size-4 text-muted-foreground" />
+            </div>
+          </Card>
         </div>
       </Section>
       <div className="flex justify-end">
