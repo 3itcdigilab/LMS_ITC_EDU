@@ -407,16 +407,6 @@ const defaultProfile: UserProfile = {
 };
 
 const getInitialProfile = (): UserProfile => {
-  if (typeof window === "undefined") return defaultProfile;
-  try {
-    const saved = localStorage.getItem("3itc_active_profile");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed && (parsed.firstName || parsed.lastName || parsed.email)) {
-        return { ...defaultProfile, ...parsed };
-      }
-    }
-  } catch (_) {}
   return defaultProfile;
 };
 
@@ -1391,36 +1381,8 @@ const StoreContext = createContext<StoreContextType | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Sync state.profile to localStorage whenever it changes
+  // ─── Direct Firestore Real-time Sync (Primary & Only Database Source) ───
   useEffect(() => {
-    if (state.profile && (state.profile.firstName || state.profile.lastName || state.profile.email)) {
-      try {
-        localStorage.setItem("3itc_active_profile", JSON.stringify(state.profile));
-      } catch (_) {}
-    }
-  }, [state.profile]);
-
-  // ─── Firestore Real-time Sync (Primary DB) + localStorage offline cache ───
-  useEffect(() => {
-    // Helper: save to localStorage as offline cache
-    const cacheSet = (key: string, data: any) => {
-      try { localStorage.setItem(key, JSON.stringify(data)); } catch (_) {}
-    };
-    const cacheGet = (key: string) => {
-      try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : null; } catch (_) { return null; }
-    };
-
-    // Load offline cache immediately so UI is never empty on first paint
-    const cachedUsers = cacheGet("3itc_users_cache");
-    const cachedInstitutions = cacheGet("3itc_institutions_cache");
-    if (cachedUsers?.length || cachedInstitutions?.length) {
-      const patch: Partial<StoreState> = {};
-      if (cachedUsers?.length) patch.users = cachedUsers;
-      if (cachedInstitutions?.length) patch.institutions = cachedInstitutions;
-      dispatch({ type: "HYDRATE", payload: patch });
-    }
-
-    // Real-time Firestore listeners — when Firestore is available, these override the cache
     const capitalizeRole = (r: string) => r ? r.charAt(0).toUpperCase() + r.slice(1).toLowerCase() : "Student";
     const unsubProfiles = onSnapshot(collection(db, "profiles"), (snap) => {
       if (!snap.empty) {
@@ -1436,7 +1398,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const bio = data.bio || "";
           const email = data.email || "";
 
-          // Populate userProfilesMap for public profile modals and member lists
           const userKey = fullName.toLowerCase();
           if (userKey) {
             userProfilesMap[userKey] = {
@@ -1458,7 +1419,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             };
           }
 
-          // Check if this doc matches the active profile email
           if (email && state.profile?.email && email.toLowerCase() === state.profile.email.toLowerCase()) {
             matchingProfilePatch = {
               avatarUrl: avatarUrl || state.profile.avatarUrl,
@@ -1495,7 +1455,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
 
         dispatch({ type: "HYDRATE", payload: patch });
-        cacheSet("3itc_users_cache", users);
       }
     }, err => console.warn("Firestore profiles listener:", err));
 
@@ -1503,7 +1462,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!snap.empty) {
         const institutions = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
         dispatch({ type: "HYDRATE", payload: { institutions } });
-        cacheSet("3itc_institutions_cache", institutions);
       }
     }, err => console.warn("Firestore institutions listener:", err));
 
@@ -1531,50 +1489,42 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const unsubFeed = onSnapshot(collection(db, "feedPosts"), (snap) => {
       const feedPosts = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
       dispatch({ type: "HYDRATE", payload: { feedPosts } });
-      cacheSet("3itc_feed_cache", feedPosts);
     }, err => console.warn("Firestore feedPosts listener:", err));
 
     const unsubForum = onSnapshot(collection(db, "forumThreads"), (snap) => {
       const forumThreads = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
       dispatch({ type: "HYDRATE", payload: { forumThreads } });
-      cacheSet("3itc_forum_cache", forumThreads);
     }, err => console.warn("Firestore forumThreads listener:", err));
 
     const unsubEvents = onSnapshot(collection(db, "events"), (snap) => {
       const events = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
       dispatch({ type: "HYDRATE", payload: { events } });
-      cacheSet("3itc_events_cache", events);
     }, err => console.warn("Firestore events listener:", err));
 
     const unsubBadges = onSnapshot(collection(db, "badges"), (snap) => {
       const badges = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
       dispatch({ type: "HYDRATE", payload: { badges } });
-      cacheSet("3itc_badges_cache", badges);
     }, err => console.warn("Firestore badges listener:", err));
 
     const unsubAssessments = onSnapshot(collection(db, "assessments"), (snap) => {
       const assessments = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
       dispatch({ type: "HYDRATE", payload: { assessments } });
-      cacheSet("3itc_assessments_cache", assessments);
     }, err => console.warn("Firestore assessments listener:", err));
 
     const unsubPortfolio = onSnapshot(collection(db, "portfolioProjects"), (snap) => {
       const portfolioProjects = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
       dispatch({ type: "HYDRATE", payload: { portfolioProjects } });
-      cacheSet("3itc_portfolio_cache", portfolioProjects);
     }, err => console.warn("Firestore portfolioProjects listener:", err));
 
     const unsubCertificates = onSnapshot(collection(db, "certificates"), (snap) => {
       const certificates = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
       dispatch({ type: "HYDRATE", payload: { certificates } });
-      cacheSet("3itc_certs_cache", certificates);
     }, err => console.warn("Firestore certificates listener:", err));
 
     const unsubLanding = onSnapshot(doc(db, "settings", "landing"), (snap) => {
       if (snap.exists()) {
         const landingContent = snap.data() as LandingContent;
         dispatch({ type: "HYDRATE", payload: { landingContent } });
-        cacheSet("3itc_landing_cache", landingContent);
       }
     }, err => console.warn("Firestore landing listener:", err));
 

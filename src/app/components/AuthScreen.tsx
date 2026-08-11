@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
   GraduationCap, Award, Users, Briefcase, ArrowRight, Mail, Lock,
-  ChevronLeft, ShieldCheck, User as UserIcon,
+  ChevronLeft, ShieldCheck, User as UserIcon, UserPlus, LogIn, Sparkles,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -13,8 +13,10 @@ import { type Role } from "../data/mock";
 import { useStore } from "../store/Store";
 import { db } from "../lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
+import { toast } from "sonner";
+import { cn } from "./ui/utils";
 
-type Mode = "splash" | "login" | "forgot" | "admin-login";
+type Mode = "splash" | "login" | "register" | "forgot" | "admin-login";
 
 const highlights = [
   { icon: GraduationCap, title: "Belajar", desc: "Video, modul, kuis & project" },
@@ -67,11 +69,19 @@ function BrandPanel() {
 
 export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogin: (role: Role) => void; onGuest: () => void; initialMode?: Mode }) {
   const navigate = useNavigate();
-  const { state, actions } = useStore();
+  const { actions } = useStore();
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  // Register State
+  const [regName, setRegName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regRole, setRegRole] = useState<Role>("student");
+
   const [errorMsg, setErrorMsg] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const DEFAULT_ACCOUNTS: Record<string, { pass: string; role: Role; name: string; institution?: string }> = {
     "3itcdigilab@gmail.com":  { pass: "gaadapasswordnya", role: "admin",      name: "Admin 3ITC",   institution: "3ITC Digital Education" },
@@ -84,6 +94,7 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
     actions.setActiveProfileByName(fullName, roleStr || "student", inst || "3ITC Digital Education", userEmail);
   };
 
+  // Direct Live Firestore Login
   const handleLoginSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setErrorMsg("");
@@ -100,89 +111,134 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
       return;
     }
 
+    setLoading(true);
     try {
-      // 1. Search dynamic users in Store (by email, full name, or username)
-      let foundUser = state.users.find(
-        u => (u?.email || "").toLowerCase() === cleanInput ||
-             (u?.name || "").toLowerCase() === cleanInput ||
-             (u?.email || "").split('@')[0].toLowerCase() === cleanInput
-      );
+      // Direct live query to Cloud Firestore DB profiles collection (NO STALE CACHE)
+      const snapshot = await getDocs(collection(db, "profiles"));
+      let matchedData: any = null;
 
-      // 2. Direct Query to Firestore DB if not in memory state yet
-      if (!foundUser) {
-        try {
-          const snapshot = await getDocs(collection(db, "profiles"));
-          if (!snapshot.empty) {
-            const matchedDoc = snapshot.docs.find(docSnap => {
-              const p = docSnap.data();
-              return (p.email || "").toLowerCase() === cleanInput ||
-                     (p.name || "").toLowerCase() === cleanInput ||
-                     (p.email || "").split('@')[0].toLowerCase() === cleanInput ||
-                     `${p.first_name || ""} ${p.last_name || ""}`.trim().toLowerCase() === cleanInput;
-            });
-            if (matchedDoc) {
-              const data = matchedDoc.data();
-              foundUser = {
-                id: matchedDoc.id,
-                name: data.name || `${data.first_name || ""} ${data.last_name || ""}`.trim() || data.email,
-                email: data.email,
-                password: data.password || "gaadapasswordnya",
-                role: data.role || "student",
-                institution: data.institution || "3ITC Digital Education",
-                status: data.status || "Active",
-                createdAt: data.created_at || data.createdAt || new Date().toISOString(),
-              };
-              actions.addUser(foundUser);
-            }
-          }
-        } catch (dbErr) {
-          console.warn("Firestore profiles query warning:", dbErr);
+      if (!snapshot.empty) {
+        const matchedDoc = snapshot.docs.find(docSnap => {
+          const p = docSnap.data();
+          const pEmail = (p.email || "").toLowerCase();
+          const pName = (p.name || `${p.first_name || ""} ${p.last_name || ""}`).trim().toLowerCase();
+          const pPrefix = pEmail.split('@')[0];
+          return pEmail === cleanInput || pName === cleanInput || pPrefix === cleanInput;
+        });
+
+        if (matchedDoc) {
+          matchedData = matchedDoc.data();
         }
       }
 
-      // 3. Validate found user from Store / Firestore and verify password strictly
-      if (foundUser) {
-        if (foundUser.status === "Suspended") {
+      if (matchedData) {
+        if (matchedData.status === "Suspended") {
           setErrorMsg("Akun Anda sedang dinonaktifkan (Suspended). Hubungi Admin.");
+          setLoading(false);
           return;
         }
-        
-        // Strict password verification against stored password
-        const expectedPassword = (foundUser.password && foundUser.password.trim() !== "")
-          ? foundUser.password.trim()
+
+        const expectedPassword = (matchedData.password && matchedData.password.trim() !== "")
+          ? matchedData.password.trim()
           : "gaadapasswordnya";
 
         if (cleanPass !== expectedPassword) {
           setErrorMsg("Password yang Anda masukkan salah. Silakan periksa kembali!");
+          setLoading(false);
           return;
         }
 
-        const userRole = (foundUser.role?.toLowerCase() || "student") as Role;
-        syncUserProfile(foundUser.name, foundUser.institution, userRole, foundUser.email);
+        const userRole = (matchedData.role?.toLowerCase() || "student") as Role;
+        const userFullName = matchedData.name || `${matchedData.first_name || ""} ${matchedData.last_name || ""}`.trim() || matchedData.email;
+        syncUserProfile(userFullName, matchedData.institution, userRole, matchedData.email);
+        toast.success(`Selamat datang kembali, ${userFullName}!`);
         onLogin(userRole);
+        setLoading(false);
         return;
       }
 
-      // 4. Fallback for unseeded default accounts only if not found in DB/Store
+      // Fallback check for unseeded DEFAULT_ACCOUNTS
       const defaultAccKey = Object.keys(DEFAULT_ACCOUNTS).find(
         k => k.toLowerCase() === cleanInput || k.split('@')[0].toLowerCase() === cleanInput
       );
       if (defaultAccKey) {
         const acc = DEFAULT_ACCOUNTS[defaultAccKey];
         if (acc.pass === cleanPass) {
+          // Auto-seed to Cloud Firestore DB permanently
+          actions.addUser({
+            name: acc.name,
+            email: defaultAccKey,
+            password: acc.pass,
+            role: acc.role,
+            institution: acc.institution || "3ITC Digital Education",
+            status: "Active",
+          });
           syncUserProfile(acc.name, acc.institution, acc.role, defaultAccKey);
+          toast.success(`Selamat datang kembali, ${acc.name}!`);
           onLogin(acc.role);
+          setLoading(false);
           return;
         } else {
           setErrorMsg("Password yang Anda masukkan salah. Silakan periksa kembali!");
+          setLoading(false);
           return;
         }
       }
 
-      setErrorMsg("User / Email atau password salah. Akun tidak ditemukan!");
+      setErrorMsg("User / Email atau password salah. Akun tidak ditemukan di Cloud Database!");
     } catch (err) {
       console.error("Login error:", err);
-      setErrorMsg("Terjadi kesalahan saat memproses login. Silakan coba lagi.");
+      setErrorMsg("Terjadi kesalahan koneksi ke Cloud Database. Silakan coba lagi.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Direct Live Firestore Account Registration
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+
+    const cleanName = regName.trim();
+    const cleanEmail = regEmail.trim().toLowerCase();
+    const cleanPass = regPassword.trim();
+
+    if (!cleanName || !cleanEmail || !cleanPass) {
+      setErrorMsg("Nama Lengkap, Email, dan Password wajib diisi!");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Check if email already exists in Cloud Firestore DB
+      const snapshot = await getDocs(collection(db, "profiles"));
+      if (!snapshot.empty) {
+        const existingDoc = snapshot.docs.find(d => (d.data().email || "").toLowerCase() === cleanEmail);
+        if (existingDoc) {
+          setErrorMsg("Email ini sudah terdaftar di database! Silakan Masuk (Login).");
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Add user to Cloud Firestore DB `profiles` collection
+      actions.addUser({
+        name: cleanName,
+        email: cleanEmail,
+        password: cleanPass,
+        role: regRole,
+        institution: "3ITC Digital Education",
+        status: "Active",
+      });
+
+      syncUserProfile(cleanName, "3ITC Digital Education", regRole, cleanEmail);
+      toast.success("Pendaftaran berhasil! Akun Anda telah disimpan di Cloud Firestore Database! 🎉");
+      onLogin(regRole);
+    } catch (err) {
+      console.error("Registration error:", err);
+      setErrorMsg("Gagal menyimpan akun ke Cloud Database. Silakan coba lagi.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -224,6 +280,127 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
                 <Button className="w-full" size="lg" onClick={() => setMode("login")}>
                   Masuk Akun <ArrowRight className="size-4" />
                 </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Login / Register Tabs ── */}
+          {(mode === "login" || mode === "register" || mode === "admin-login") && (
+            <div className="flex items-center gap-2 mb-6 border-b border-border pb-3">
+              <button
+                type="button"
+                onClick={() => { setMode("login"); setErrorMsg(""); }}
+                className={cn(
+                  "flex-1 py-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2",
+                  mode === "login"
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                )}
+              >
+                <LogIn className="size-4" /> Masuk (Login)
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode("register"); setErrorMsg(""); }}
+                className={cn(
+                  "flex-1 py-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2",
+                  mode === "register"
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                )}
+              >
+                <UserPlus className="size-4" /> Buat Akun Baru
+              </button>
+            </div>
+          )}
+
+          {/* ── Register Mode ── */}
+          {mode === "register" && (
+            <div>
+              <h2 className="text-secondary font-bold text-xl" style={{ fontFamily: "var(--font-display)" }}>
+                Daftar Akun Baru
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Buat akun untuk langsung terhubung dengan Cloud Database 3itcedu.
+              </p>
+
+              <form onSubmit={handleRegisterSubmit} className="mt-6 space-y-4">
+                {errorMsg && (
+                  <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive font-medium">
+                    {errorMsg}
+                  </div>
+                )}
+
+                <div>
+                  <Label htmlFor="regName">Nama Lengkap</Label>
+                  <div className="relative mt-1.5">
+                    <UserIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="regName"
+                      type="text"
+                      placeholder="Contoh: Danisha Azzahra"
+                      value={regName}
+                      onChange={(e) => setRegName(e.target.value)}
+                      className="pl-9"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="regEmail">Email</Label>
+                  <div className="relative mt-1.5">
+                    <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="regEmail"
+                      type="email"
+                      placeholder="nama@email.com"
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      className="pl-9"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="regPassword">Password</Label>
+                  <div className="relative mt-1.5">
+                    <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="regPassword"
+                      type="password"
+                      placeholder="Buat password unik"
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      className="pl-9"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="regRole">Tipe Akun</Label>
+                  <select
+                    id="regRole"
+                    value={regRole}
+                    onChange={(e) => setRegRole(e.target.value as Role)}
+                    className="w-full mt-1.5 rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="student">Pelajar / Siswa (Student)</option>
+                    <option value="mentor">Mentor / Pengajar</option>
+                  </select>
+                </div>
+
+                <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                  {loading ? "Mendaftarkan ke Cloud DB..." : "Daftar Sekarang"} <UserPlus className="size-4 ml-1" />
+                </Button>
+              </form>
+
+              <div className="mt-6 text-center">
+                <button type="button" onClick={() => setMode("login")} className="text-xs text-primary font-semibold hover:underline">
+                  Sudah punya akun? Masuk di sini
+                </button>
               </div>
             </div>
           )}
@@ -285,8 +462,8 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full" size="lg">
-                  Masuk Sekarang <ArrowRight className="size-4 ml-1" />
+                <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                  {loading ? "Verifikasi ke Cloud DB..." : "Masuk Sekarang"} <ArrowRight className="size-4 ml-1" />
                 </Button>
               </form>
 
