@@ -231,16 +231,7 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
-                    <button
-                      type="button"
-                      className="text-xs text-primary hover:underline"
-                      onClick={() => setMode("forgot")}
-                    >
-                      Lupa password?
-                    </button>
-                  </div>
+                  <Label htmlFor="password">Password</Label>
                   <div className="relative mt-1.5">
                     <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -260,7 +251,18 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
                 </Button>
               </form>
 
-
+              {/* Notice Bantuan Lupa Password */}
+              <div className="mt-4 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-center">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Jika mengalami lupa password, silakan kontak admin di{" "}
+                  <a
+                    href="mailto:3itcdigilab@gmail.com"
+                    className="font-semibold text-primary hover:underline"
+                  >
+                    3itcdigilab@gmail.com
+                  </a>
+                </p>
+              </div>
 
               <div className="mt-6 text-center">
                 <a href="/" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
@@ -270,7 +272,7 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
             </div>
           )}
 
-          {/* ── Forgot Password ── */}
+          {/* ── Forgot Password / Bantuan ── */}
           {mode === "forgot" && (
             <div>
               <button
@@ -280,20 +282,25 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
               >
                 <ChevronLeft className="size-4" /> Kembali ke halaman masuk
               </button>
-              <h2 className="text-secondary" style={{ fontFamily: "var(--font-display)" }}>Reset password</h2>
-              <p className="mt-1 text-muted-foreground">
-                Masukkan emailmu dan kami akan kirimkan link reset.
-              </p>
-              <Card className="mt-6 p-6 space-y-4">
-                <div>
-                  <Label htmlFor="remail">Email</Label>
-                  <div className="relative mt-1.5">
-                    <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input id="remail" type="email" placeholder="3itcdigilab@gmail.com" className="pl-9" />
-                  </div>
+              <h2 className="text-secondary font-bold text-xl" style={{ fontFamily: "var(--font-display)" }}>Bantuan Lupa Password</h2>
+              <Card className="mt-6 p-6 space-y-4 text-center">
+                <div className="mx-auto size-12 rounded-full bg-blue-500/10 text-primary flex items-center justify-center">
+                  <Mail className="size-6" />
                 </div>
-                <Button className="w-full" size="lg" onClick={() => setMode("login")}>
-                  Kirim link reset
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Jika Anda mengalami kendala lupa password atau lupa akun, silakan hubungi tim Admin kami melalui email di:
+                </p>
+                <a
+                  href="mailto:3itcdigilab@gmail.com"
+                  className="inline-block font-bold text-base text-primary hover:underline"
+                >
+                  3itcdigilab@gmail.com
+                </a>
+                <p className="text-xs text-muted-foreground">
+                  Tim kami akan segera membantu melakukan reset password akun Anda.
+                </p>
+                <Button className="w-full mt-4" variant="outline" onClick={() => setMode("login")}>
+                  Kembali ke Login
                 </Button>
               </Card>
             </div>
