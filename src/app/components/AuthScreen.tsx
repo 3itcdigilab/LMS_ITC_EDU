@@ -182,7 +182,7 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
                 className="mt-8 text-secondary font-bold text-2xl"
                 style={{ fontFamily: "var(--font-display)" }}
               >
-                Selamat Datang di 3ITC
+                Selamat Datang di 3itcedu
               </h2>
               <p className="mt-2 text-muted-foreground">
                 Mulai perjalananmu dari belajar hingga karier.
@@ -204,7 +204,7 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
                 </h2>
               </div>
               <p className="text-sm text-muted-foreground">
-                Masukkan user/email dan password untuk masuk ke platform 3ITC.
+                Masukkan user/email dan password untuk masuk ke platform 3itcedu.
               </p>
 
               <form onSubmit={handleLoginSubmit} className="mt-6 space-y-4">

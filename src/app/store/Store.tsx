@@ -5,6 +5,7 @@
 
 import { createContext, useContext, useReducer, useEffect, type ReactNode } from "react";
 import { type Role } from "../data/mock";
+import { supabase, isSupabaseConfigured } from "../lib/supabase";
 
 // ─── Curriculum content types ─────────────────────────────────────────────────
 
@@ -1214,6 +1215,63 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) dispatch({ type: "HYDRATE", payload: JSON.parse(saved) });
     } catch { /* corrupt storage — start fresh */ }
+
+    if (isSupabaseConfigured && supabase) {
+      Promise.all([
+        supabase.from("courses").select("*"),
+        supabase.from("enrollments").select("*"),
+        supabase.from("reviews").select("*"),
+        supabase.from("feed_posts").select("*"),
+      ]).then(([coursesRes, enrollmentsRes, reviewsRes, feedsRes]) => {
+        const patch: Partial<StoreState> = {};
+        if (coursesRes.data && coursesRes.data.length > 0) patch.courses = coursesRes.data as any;
+        if (enrollmentsRes.data && enrollmentsRes.data.length > 0) {
+          patch.enrollments = enrollmentsRes.data.map(e => ({
+            id: e.id,
+            courseId: e.course_id,
+            userKey: e.user_key,
+            progress: e.progress,
+            completedLessons: e.completed_lessons || [],
+            quizAttempts: e.quiz_attempts || {},
+            enrolledAt: e.enrolled_at,
+            lastAccessedAt: e.last_accessed_at,
+          }));
+        }
+        if (reviewsRes.data && reviewsRes.data.length > 0) {
+          patch.reviews = reviewsRes.data.map(r => ({
+            id: r.id,
+            courseId: r.course_id,
+            userName: r.user_name,
+            userAvatar: r.user_avatar,
+            userRole: r.user_role,
+            rating: r.rating,
+            comment: r.comment,
+            createdAt: r.created_at,
+          }));
+        }
+        if (feedsRes.data && feedsRes.data.length > 0) {
+          patch.feedPosts = feedsRes.data.map(f => ({
+            id: f.id,
+            authorId: f.author_id,
+            authorName: f.author_name,
+            authorRole: f.author_role,
+            authorAvatar: f.author_avatar,
+            content: f.content,
+            imageUrl: f.image_url,
+            likes: f.likes || 0,
+            likedBy: f.liked_by || [],
+            repostCount: f.repost_count || 0,
+            repostedBy: f.reposted_by || [],
+            originalPost: f.original_post,
+            comments: f.comments || [],
+            createdAt: f.created_at,
+          }));
+        }
+        if (Object.keys(patch).length > 0) {
+          dispatch({ type: "HYDRATE", payload: patch });
+        }
+      }).catch(err => console.warn("Supabase initial sync:", err));
+    }
   }, []);
 
   useEffect(() => {

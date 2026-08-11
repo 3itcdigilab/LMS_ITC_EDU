@@ -13,7 +13,7 @@ export function Logo({ variant = "dark", size = "md" }: { variant?: "dark" | "li
       </div>
       <div className="leading-tight">
         <div className={cn("font-display font-bold tracking-tight", text, variant === "light" ? "text-white" : "text-secondary dark:text-white")} style={{ fontFamily: "var(--font-display)" }}>
-          3ITC
+          3itcedu
         </div>
         <div className={cn("text-[11px] -mt-0.5", variant === "light" ? "text-slate-300" : "text-muted-foreground dark:text-slate-400")}>
           Digital Education

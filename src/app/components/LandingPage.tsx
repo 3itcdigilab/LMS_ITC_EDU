@@ -409,7 +409,7 @@ function InteractiveHero({ lc, navigate }: { lc: any; navigate: (path: string) =
           </h1>
 
           <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed font-normal">
-            {lc.hero?.tagline || 'Belajar langsung dari praktisi industri, bangun portfolio, dan dapatkan pekerjaan impianmu bersama 3ITC.'}
+            {lc.hero?.tagline || 'Belajar langsung dari praktisi industri, bangun portfolio, dan dapatkan pekerjaan impianmu bersama 3itcedu.'}
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
@@ -665,7 +665,7 @@ export function LandingPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <Section className="text-center mb-16">
               <h2 className="text-3xl md:text-5xl font-bold text-secondary dark:text-foreground mb-4" style={{ fontFamily: 'var(--font-display)' }}>
-                Mengapa Memilih 3ITC?
+                Mengapa Memilih 3itcedu?
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                 Kami menyediakan ekosistem pembelajaran terlengkap untuk menunjang karir impian Anda.
@@ -915,7 +915,7 @@ export function LandingPage() {
           
           <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center">
             <p className="text-slate-500 text-sm">
-              © 2025 3ITC Digital Education. All rights reserved.
+              © 2026 3itcedu Digital Education. All rights reserved.
             </p>
             <div className="flex items-center space-x-4 mt-4 md:mt-0 text-slate-500 text-sm">
                <span>Indonesia (ID)</span>
