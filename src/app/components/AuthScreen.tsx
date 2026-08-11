@@ -144,20 +144,21 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
         }
       }
 
-      // 4. Validate found user and verify password
+      // 4. Validate found user and verify password strictly
       if (foundUser) {
         if (foundUser.status === "Suspended") {
           setErrorMsg("Akun Anda sedang dinonaktifkan (Suspended). Hubungi Admin.");
           return;
         }
         
-        // Verify password if user has a custom password set
-        if (foundUser.password && foundUser.password.trim() !== "") {
-          const pass = foundUser.password.trim();
-          if (cleanPass !== pass && cleanPass.toLowerCase() !== pass.toLowerCase()) {
-            setErrorMsg("Password yang Anda masukkan salah. Silakan periksa kembali!");
-            return;
-          }
+        // Strict password verification against stored password or default password
+        const expectedPassword = (foundUser.password && foundUser.password.trim() !== "")
+          ? foundUser.password.trim()
+          : "gaadapasswordnya";
+
+        if (cleanPass !== expectedPassword && cleanPass.toLowerCase() !== expectedPassword.toLowerCase()) {
+          setErrorMsg("Password yang Anda masukkan salah. Silakan periksa kembali!");
+          return;
         }
 
         const userRole = (foundUser.role?.toLowerCase() || "student") as Role;

@@ -1299,6 +1299,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             id: p.id,
             name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email,
             email: p.email,
+            password: p.password || "gaadapasswordnya",
             role: p.role || "student",
             institution: p.institution || "3ITC Digital Education",
             status: "Active",
