@@ -151,12 +151,11 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
           return;
         }
         
-        // Strict password check if user has a password set
-        if (foundUser.password) {
-          if (foundUser.password !== cleanPass && foundUser.password.toLowerCase() !== cleanPass.toLowerCase()) {
-            setErrorMsg("Password yang Anda masukkan salah. Silakan periksa kembali!");
-            return;
-          }
+        // Strict password check for EVERY user account
+        const expectedPassword = foundUser.password || "gaadapasswordnya";
+        if (cleanPass !== expectedPassword && cleanPass.toLowerCase() !== expectedPassword.toLowerCase()) {
+          setErrorMsg("Password yang Anda masukkan salah. Silakan periksa kembali!");
+          return;
         }
 
         const userRole = (foundUser.role?.toLowerCase() || "student") as Role;

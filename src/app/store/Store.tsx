@@ -1438,6 +1438,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           first_name: parts[0] || d.name,
           last_name: parts.slice(1).join(" ") || "",
           email: d.email,
+          password: d.password || "gaadapasswordnya",
           role: d.role?.toLowerCase() || "student",
           institution: d.institution || "3ITC",
         }).then(({ error }) => { if (error) console.warn("Supabase addUser error:", error); });
