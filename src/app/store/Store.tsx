@@ -150,6 +150,7 @@ export interface ExperienceItem {
 
 export interface UserProfile {
   id: string;
+  email?: string;
   firstName: string; lastName: string; headline: string; bio: string;
   phone: string; city: string; dateOfBirth: string;
   institution: string; major: string; enrollYear: string; graduateYear: string;
@@ -643,7 +644,7 @@ function reducer(state: StoreState, action: Action): StoreState {
       return { ...state, profile: updatedProfile, userProfilesMap: newMap };
     }
     case "SET_ACTIVE_PROFILE_BY_NAME": {
-      const { name, defaultRole, institution } = action.payload;
+      const { name, defaultRole, institution, email } = action.payload;
       const userKey = (name || "").trim().toLowerCase();
       if (!userKey) return state;
 
@@ -653,7 +654,7 @@ function reducer(state: StoreState, action: Action): StoreState {
       if (saved && (saved.firstName || saved.lastName)) {
         return {
           ...state,
-          profile: saved as UserProfile,
+          profile: { ...saved, email: email || saved.email || "" } as UserProfile,
         };
       }
 
@@ -666,6 +667,7 @@ function reducer(state: StoreState, action: Action): StoreState {
         id: `user-${userKey.replace(/\s+/g, "-")}`,
         firstName,
         lastName,
+        email: email || "",
         institution: institution || "3ITC Digital Education",
         headline: `${defaultRole || "student"} at ${institution || "3ITC Digital Education"}`,
         bio: `Anggota aktif 3ITC Digital Education.`,
@@ -1222,7 +1224,7 @@ interface StoreContextType {
     markAllNotificationsRead: (targetUserKey: string) => void;
     deleteNotification:  (notifId: string) => void;
     clearAllNotifications: (targetUserKey: string) => void;
-    setActiveProfileByName: (name: string, defaultRole?: string, institution?: string) => void;
+    setActiveProfileByName: (name: string, defaultRole?: string, institution?: string, email?: string) => void;
     updateFeedPost:    (patch: { id: string } & Partial<AppFeedPost>) => void;
     deleteFeedPost:    (id: string) => void;
     addBadge:          (data: Omit<AppBadge, "id" | "createdAt">) => void;
@@ -1517,7 +1519,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     markAllNotificationsRead: userKey => dispatch({ type: "MARK_ALL_NOTIFICATIONS_READ", payload: userKey }),
     deleteNotification: notifId => dispatch({ type: "DELETE_NOTIFICATION", payload: notifId }),
     clearAllNotifications: userKey => dispatch({ type: "CLEAR_ALL_NOTIFICATIONS", payload: userKey }),
-    setActiveProfileByName: (name, defaultRole, institution) => dispatch({ type: "SET_ACTIVE_PROFILE_BY_NAME", payload: { name, defaultRole, institution } }),
+    setActiveProfileByName: (name, defaultRole, institution, email) => dispatch({ type: "SET_ACTIVE_PROFILE_BY_NAME", payload: { name, defaultRole, institution, email } }),
     updateFeedPost: p => dispatch({ type: "UPDATE_FEED_POST", payload: p }),
     deleteFeedPost: id => dispatch({ type: "DELETE_FEED_POST", payload: id }),
     addBadge: d => dispatch({ type: "ADD_BADGE", payload: d }),

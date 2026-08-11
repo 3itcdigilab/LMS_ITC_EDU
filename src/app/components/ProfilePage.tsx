@@ -656,6 +656,12 @@ function AccountTab({ onLogout }: { onLogout: () => void }) {
   const [twofa,      setTwofa]      = useState(false);
   const [loginAlert, setLoginAlert] = useState(true);
 
+  useEffect(() => {
+    if (state.profile?.email) {
+      setEmail(state.profile.email);
+    }
+  }, [state.profile?.email]);
+
   const handleUpdateCredentials = () => {
     if (pass && pass.length < 6) {
       toast.error("Password baru minimal 6 karakter!");

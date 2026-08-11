@@ -80,8 +80,8 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
     "superadmin@3itcedu.id":  { pass: "superadminpass",   role: "superadmin", name: "Super Admin",  institution: "3ITC Digital Education" },
   };
 
-  const syncUserProfile = (fullName: string, inst?: string, roleStr?: string) => {
-    actions.setActiveProfileByName(fullName, roleStr || "student", inst || "3ITC Digital Education");
+  const syncUserProfile = (fullName: string, inst?: string, roleStr?: string, userEmail?: string) => {
+    actions.setActiveProfileByName(fullName, roleStr || "student", inst || "3ITC Digital Education", userEmail);
   };
 
   const handleLoginSubmit = async (e?: React.FormEvent) => {
@@ -158,7 +158,7 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
         }
 
         const userRole = (foundUser.role?.toLowerCase() || "student") as Role;
-        syncUserProfile(foundUser.name, foundUser.institution, userRole);
+        syncUserProfile(foundUser.name, foundUser.institution, userRole, foundUser.email);
         onLogin(userRole);
         return;
       }
@@ -170,7 +170,7 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
       if (defaultAccKey) {
         const acc = DEFAULT_ACCOUNTS[defaultAccKey];
         if (acc.pass === cleanPass) {
-          syncUserProfile(acc.name, acc.institution, acc.role);
+          syncUserProfile(acc.name, acc.institution, acc.role, defaultAccKey);
           onLogin(acc.role);
           return;
         } else {
