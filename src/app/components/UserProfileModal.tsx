@@ -28,6 +28,8 @@ export interface UserProfileModalData {
   portfolio?: string;
 }
 
+const cleanName = (n: string) => (n || "").replace(/\s*\((Student|Mentor|Admin|Super Admin)\)/gi, "").trim();
+
 export function UserProfileModal({
   user,
   onClose,
@@ -39,21 +41,39 @@ export function UserProfileModal({
 
   if (!user) return null;
 
-  const currentUserName = `${state.profile?.firstName || ""} ${state.profile?.lastName || ""}`.trim();
-  const targetName = user.name;
-  const isSelf = targetName.toLowerCase() === currentUserName.toLowerCase();
+  const targetName = cleanName(user.name);
+  const targetKey = targetName.toLowerCase();
+  const currentUserName = cleanName(`${state.profile?.firstName || ""} ${state.profile?.lastName || ""}`).trim();
+  const currentKey = currentUserName.toLowerCase();
+
+  const isSelf = targetKey === currentKey || (!!user.email && !!state.profile?.email && user.email.toLowerCase() === state.profile.email.toLowerCase());
+  const activeProf = isSelf ? state.profile : null;
+
+  const foundUserInStore = state.users.find(u =>
+    cleanName(u.name).toLowerCase() === targetKey ||
+    (user.email && u.email && u.email.toLowerCase() === user.email.toLowerCase())
+  );
+  const savedProf = state.userProfilesMap?.[targetKey] || state.userProfilesMap?.[user.name.toLowerCase()];
+
+  const displayAvatarUrl = user.avatarUrl || activeProf?.avatarUrl || savedProf?.avatarUrl || foundUserInStore?.avatarUrl;
+  const displayBannerUrl = user.bannerUrl || activeProf?.bannerUrl || savedProf?.bannerUrl || foundUserInStore?.bannerUrl;
+  const displayHeadline = user.headline || activeProf?.headline || savedProf?.headline || foundUserInStore?.headline;
+  const displayBio = user.bio || activeProf?.bio || savedProf?.bio || foundUserInStore?.bio;
+  const experiencesList = (user.experiences && user.experiences.length > 0) ? user.experiences : (activeProf?.experiences || savedProf?.experiences || foundUserInStore?.experiences || []);
+  const educationsList = (user.educations && user.educations.length > 0) ? user.educations : (activeProf?.educations || savedProf?.educations || foundUserInStore?.educations || []);
+  const skillsList = (user.skills && user.skills.length > 0) ? user.skills : (activeProf?.skills || savedProf?.skills || foundUserInStore?.skills || []);
 
   const isFriend = (state.friendConnections || []).includes(targetName) || (state.friendConnections || []).includes(user.email || "");
 
   const pendingSent = (state.friendRequests || []).find(
-    r => r.senderName.toLowerCase() === currentUserName.toLowerCase() &&
-         (r.receiverName.toLowerCase() === targetName.toLowerCase() || (user.email && r.receiverEmail === user.email)) &&
+    r => r.senderName.toLowerCase() === currentKey &&
+         (r.receiverName.toLowerCase() === targetKey || (user.email && r.receiverEmail === user.email)) &&
          r.status === "pending"
   );
 
   const pendingReceived = (state.friendRequests || []).find(
-    r => r.receiverName.toLowerCase() === currentUserName.toLowerCase() &&
-         (r.senderName.toLowerCase() === targetName.toLowerCase() || (user.email && r.senderEmail === user.email)) &&
+    r => r.receiverName.toLowerCase() === currentKey &&
+         (r.senderName.toLowerCase() === targetKey || (user.email && r.senderEmail === user.email)) &&
          r.status === "pending"
   );
 
@@ -77,17 +97,13 @@ export function UserProfileModal({
     }
   };
 
-  const educationsList = user.educations || [];
-  const experiencesList = user.experiences || [];
-  const skillsList = user.skills || [];
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <Card className="w-full max-w-2xl overflow-hidden bg-card shadow-2xl border-border/60 max-h-[90vh] flex flex-col">
         {/* Banner Header */}
         <div className="relative h-36 w-full shrink-0 overflow-hidden bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900">
-          {user.bannerUrl ? (
-            <img src={user.bannerUrl} alt="Banner" className="h-full w-full object-cover" />
+          {displayBannerUrl ? (
+            <img src={displayBannerUrl} alt="Banner" className="h-full w-full object-cover" />
           ) : (
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-600/30 via-indigo-600/20 to-transparent" />
           )}
@@ -105,11 +121,11 @@ export function UserProfileModal({
         <div className="px-6 pb-4 pt-0 relative border-b shrink-0 bg-card">
           <div className="flex flex-wrap items-end justify-between gap-4 -mt-12 mb-3">
             <Avatar className="size-24 border-4 border-card shadow-lg ring-2 ring-primary/20">
-              {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt={user.name} className="size-full object-cover rounded-full" />
+              {displayAvatarUrl ? (
+                <img src={displayAvatarUrl} alt={targetName} className="size-full object-cover rounded-full" />
               ) : (
                 <AvatarFallback className="bg-primary text-white text-2xl font-bold">
-                  {user.name ? user.name[0].toUpperCase() : "U"}
+                  {targetName ? targetName[0].toUpperCase() : "U"}
                 </AvatarFallback>
               )}
             </Avatar>
@@ -145,7 +161,7 @@ export function UserProfileModal({
 
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-extrabold text-foreground">{user.name}</h2>
+              <h2 className="text-xl font-extrabold text-foreground">{targetName}</h2>
               <Badge variant="secondary" className="capitalize text-xs font-semibold">
                 {user.role || "Pelajar"}
               </Badge>
@@ -153,14 +169,14 @@ export function UserProfileModal({
             <p className="text-xs text-muted-foreground mt-0.5 font-medium flex items-center gap-1.5">
               <Building2 className="size-3.5 text-primary" /> {user.institution || "3ITC Digital Education"}
             </p>
-            {user.headline && (
+            {displayHeadline && (
               <p className="text-sm text-foreground/90 font-medium mt-2 leading-relaxed">
-                {user.headline}
+                {displayHeadline}
               </p>
             )}
-            {user.bio && (
+            {displayBio && (
               <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                {user.bio}
+                {displayBio}
               </p>
             )}
             {/* Featured Badge */}

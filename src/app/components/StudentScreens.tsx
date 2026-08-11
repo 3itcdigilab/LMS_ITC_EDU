@@ -1735,25 +1735,35 @@ export function CommunityForum() {
     toast.success("Balasan berhasil diperbarui!");
   };
 
+  const cleanProfileName = (n: string) => (n || "").replace(/\s*\((Student|Mentor|Admin|Super Admin)\)/gi, "").trim();
+
   const openProfileByName = (name: string, role?: string, email?: string) => {
-    const key = name.toLowerCase();
-    const savedProf = state.userProfilesMap?.[key];
-    const isCurrent = key === currentUserName.toLowerCase();
+    const cleanedName = cleanProfileName(name);
+    const key = cleanedName.toLowerCase();
+
+    const foundUserInStore = state.users.find(u =>
+      cleanProfileName(u.name).toLowerCase() === key ||
+      (email && u.email && u.email.toLowerCase() === email.toLowerCase())
+    );
+
+    const savedProf = state.userProfilesMap?.[key] || state.userProfilesMap?.[name.toLowerCase()];
+    const currentCleanName = cleanProfileName(currentUserName).toLowerCase();
+    const isCurrent = key === currentCleanName || (!!email && !!state.profile?.email && email.toLowerCase() === state.profile.email.toLowerCase());
     const activeProf = isCurrent ? state.profile : null;
 
-    const foundMember = dynamicMembers.find(m => m.name.toLowerCase() === key);
+    const foundMember = dynamicMembers.find(m => cleanProfileName(m.name).toLowerCase() === key);
 
-    const mergedName = name;
-    const mergedEmail = email || foundMember?.email || (isCurrent ? `${currentUserName.toLowerCase().replace(/\s+/g, '')}@gmail.com` : `${key.replace(/\s+/g, '')}@3itcedu.id`);
-    const mergedRole = role || foundMember?.role || "student";
-    const mergedInstitution = activeProf?.institution || savedProf?.institution || foundMember?.institution || "3ITC Digital Education";
-    const mergedHeadline = activeProf?.headline || savedProf?.headline || foundMember?.headline || `${mergedRole} at ${mergedInstitution}`;
-    const mergedBio = activeProf?.bio || savedProf?.bio || foundMember?.bio || `Anggota aktif di platform 3ITC Digital Education.`;
-    const mergedAvatarUrl = activeProf?.avatarUrl || savedProf?.avatarUrl || foundMember?.avatarUrl;
-    const mergedBannerUrl = activeProf?.bannerUrl || savedProf?.bannerUrl || foundMember?.bannerUrl;
-    const mergedEducations = activeProf?.educations || savedProf?.educations || foundMember?.educations;
-    const mergedExperiences = activeProf?.experiences || savedProf?.experiences || foundMember?.experiences;
-    const mergedSkills = activeProf?.skills || savedProf?.skills || foundMember?.skills;
+    const mergedName = cleanedName;
+    const mergedEmail = email || foundUserInStore?.email || activeProf?.email || savedProf?.email || foundMember?.email || (isCurrent ? `${currentUserName.toLowerCase().replace(/\s+/g, '')}@gmail.com` : `${key.replace(/\s+/g, '')}@3itcedu.id`);
+    const mergedRole = role || foundUserInStore?.role || foundMember?.role || "student";
+    const mergedInstitution = activeProf?.institution || savedProf?.institution || foundUserInStore?.institution || foundMember?.institution || "3ITC Digital Education";
+    const mergedHeadline = activeProf?.headline || savedProf?.headline || foundUserInStore?.headline || foundMember?.headline || `${mergedRole} at ${mergedInstitution}`;
+    const mergedBio = activeProf?.bio || savedProf?.bio || foundUserInStore?.bio || foundMember?.bio || `Anggota aktif di platform 3ITC Digital Education.`;
+    const mergedAvatarUrl = activeProf?.avatarUrl || savedProf?.avatarUrl || foundUserInStore?.avatarUrl || foundMember?.avatarUrl;
+    const mergedBannerUrl = activeProf?.bannerUrl || savedProf?.bannerUrl || foundUserInStore?.bannerUrl || foundMember?.bannerUrl;
+    const mergedEducations = activeProf?.educations || savedProf?.educations || foundUserInStore?.educations || foundMember?.educations;
+    const mergedExperiences = activeProf?.experiences || savedProf?.experiences || foundUserInStore?.experiences || foundMember?.experiences;
+    const mergedSkills = activeProf?.skills || savedProf?.skills || foundUserInStore?.skills || foundMember?.skills;
 
     setViewingUserProfile({
       name: mergedName,
