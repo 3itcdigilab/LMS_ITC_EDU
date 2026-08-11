@@ -653,9 +653,6 @@ export function LandingPage() {
                   )}
                 </div>
                 <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">{cat.name}</h3>
-                <span className="text-[11px] text-muted-foreground mt-1 group-hover:text-primary transition-colors flex items-center gap-1">
-                  Lihat Detail <ChevronRight className="w-3.5 h-3.5" />
-                </span>
               </div>
             ))}
           </div>
@@ -698,10 +695,6 @@ export function LandingPage() {
                       <CardDescription className="text-base leading-relaxed">
                         {feature.description}
                       </CardDescription>
-                      <div className="mt-4 pt-3 border-t border-border/40 text-xs font-semibold text-primary flex items-center justify-between">
-                        <span>Pelajari Lebih Lanjut</span>
-                        <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                      </div>
                     </CardContent>
                   </Card>
                 </Section>
