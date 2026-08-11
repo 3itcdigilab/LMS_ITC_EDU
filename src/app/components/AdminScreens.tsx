@@ -470,9 +470,72 @@ function AddInstitutionModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function EditInstitutionModal({ institution, onClose }: { institution: Institution; onClose: () => void }) {
+  const { actions } = useStore();
+  const [form, setForm] = useState<Institution>({ ...institution });
+  const set = (k: string, v: string | number) => setForm(f => ({ ...f, [k]: v }));
+
+  return (
+    <Modal title={`Kelola Institusi — ${institution.name}`} onClose={onClose}>
+      <div className="space-y-4">
+        <div>
+          <label className="text-sm font-medium">Nama institusi</label>
+          <Input className="mt-1" value={form.name} onChange={e => set("name", e.target.value)} placeholder="cth: 3ITC Digital Education" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium">Tipe Institusi</label>
+            <select className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm" value={form.type} onChange={e => set("type", e.target.value)}>
+              {["High School", "Vocational", "University", "Bootcamp", "Company", "Other"].map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium">Plan</label>
+            <select className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm" value={form.plan} onChange={e => set("plan", e.target.value)}>
+              {["Free", "Pro", "Enterprise"].map(p => <option key={p}>{p}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium">Wilayah / Kota</label>
+            <Input className="mt-1" value={form.region} onChange={e => set("region", e.target.value)} placeholder="cth: Jakarta" />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Status</label>
+            <select className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm" value={form.status} onChange={e => set("status", e.target.value)}>
+              {["Active", "Pending", "Suspended"].map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-sm font-medium">Jumlah Pelajar</label>
+            <Input type="number" className="mt-1" value={form.students} onChange={e => set("students", Number(e.target.value))} />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Jumlah Pengajar</label>
+            <Input type="number" className="mt-1" value={form.teachers} onChange={e => set("teachers", Number(e.target.value))} />
+          </div>
+        </div>
+      </div>
+      <div className="mt-5 flex justify-end gap-2">
+        <Button variant="outline" onClick={onClose}>Batal</Button>
+        <Button onClick={() => {
+          if (!form.name) { toast.error("Nama institusi wajib diisi."); return; }
+          actions.updateInstitution(form);
+          toast.success(`Institusi ${form.name} berhasil diperbarui!`);
+          onClose();
+        }}>Simpan Perubahan</Button>
+      </div>
+    </Modal>
+  );
+}
+
 export function InstitutionManagement() {
   const { state, actions } = useStore();
   const [showAdd, setShowAdd] = useState(false);
+  const [editingInstitution, setEditingInstitution] = useState<Institution | null>(null);
   const [deletingInstitution, setDeletingInstitution] = useState<{ id: string; name: string } | null>(null);
 
   return (
@@ -491,6 +554,7 @@ export function InstitutionManagement() {
         onClose={() => setDeletingInstitution(null)}
       />
       {showAdd && <AddInstitutionModal onClose={() => setShowAdd(false)} />}
+      {editingInstitution && <EditInstitutionModal institution={editingInstitution} onClose={() => setEditingInstitution(null)} />}
       <PageHeader title="Manajemen Institusi" subtitle="Sekolah dan universitas di platform"
         actions={<Button onClick={() => setShowAdd(true)}><Plus className="size-4" /> Tambah institusi</Button>} />
       {state.institutions.length === 0 ? (
@@ -514,7 +578,7 @@ export function InstitutionManagement() {
                 <div className="rounded-lg bg-muted p-3"><p className="font-bold text-secondary">{inst.plan}</p><p className="text-xs text-muted-foreground">Plan</p></div>
               </div>
               <div className="mt-4 flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1">Kelola</Button>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setEditingInstitution(inst)}>Kelola</Button>
                 <button onClick={() => setDeletingInstitution({ id: inst.id, name: inst.name })}
                   className="flex items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/5 transition-colors">
                   <Trash2 className="size-3.5" /> Hapus
