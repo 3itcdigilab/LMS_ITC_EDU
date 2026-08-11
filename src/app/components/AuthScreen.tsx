@@ -11,6 +11,8 @@ import { Card } from "./ui/card";
 import { Logo } from "./shared";
 import { type Role } from "../data/mock";
 import { useStore } from "../store/Store";
+import { db } from "../lib/firebase";
+import { collection, getDocs } from "firebase/firestore";
 
 type Mode = "splash" | "login" | "forgot" | "admin-login";
 
@@ -120,27 +122,34 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
         u => (u?.email || "").toLowerCase() === cleanInput || (u?.name || "").toLowerCase() === cleanInput
       );
 
-      // 3. Direct Query to Supabase DB if not in memory state yet
-      if (!foundUser && isSupabaseConfigured && supabase) {
-        const { data: dbProfiles } = await supabase.from("profiles").select("*");
-        if (dbProfiles && dbProfiles.length > 0) {
-          const matched = dbProfiles.find(
-            p => (p.email || "").toLowerCase() === cleanInput ||
-                 `${p.first_name || ""} ${p.last_name || ""}`.trim().toLowerCase() === cleanInput ||
-                 (p.first_name || "").toLowerCase() === cleanInput
-          );
-          if (matched) {
-            foundUser = {
-              id: matched.id,
-              name: `${matched.first_name || ""} ${matched.last_name || ""}`.trim() || matched.email,
-              email: matched.email,
-              role: matched.role || "student",
-              institution: matched.institution || "3ITC Digital Education",
-              status: "Active",
-              createdAt: matched.created_at || new Date().toISOString(),
-            };
-            actions.addUser(foundUser);
+      // 3. Direct Query to Firestore DB if not in memory state yet
+      if (!foundUser) {
+        try {
+          const snapshot = await getDocs(collection(db, "profiles"));
+          if (!snapshot.empty) {
+            const matchedDoc = snapshot.docs.find(docSnap => {
+              const p = docSnap.data();
+              return (p.email || "").toLowerCase() === cleanInput ||
+                     (p.name || "").toLowerCase() === cleanInput ||
+                     `${p.first_name || ""} ${p.last_name || ""}`.trim().toLowerCase() === cleanInput;
+            });
+            if (matchedDoc) {
+              const data = matchedDoc.data();
+              foundUser = {
+                id: matchedDoc.id,
+                name: data.name || `${data.first_name || ""} ${data.last_name || ""}`.trim() || data.email,
+                email: data.email,
+                password: data.password || "gaadapasswordnya",
+                role: data.role || "student",
+                institution: data.institution || "3ITC Digital Education",
+                status: data.status || "Active",
+                createdAt: data.created_at || data.createdAt || new Date().toISOString(),
+              };
+              actions.addUser(foundUser);
+            }
           }
+        } catch (dbErr) {
+          console.warn("Firestore profiles query warning:", dbErr);
         }
       }
 
