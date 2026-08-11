@@ -1301,7 +1301,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     completeLesson:    (courseId, lessonId, totalLessons) => dispatch({ type: "COMPLETE_LESSON", payload: { courseId, lessonId, totalLessons } }),
     recordQuizAttempt: (courseId, lessonId) => dispatch({ type: "RECORD_QUIZ_ATTEMPT", payload: { courseId, lessonId } }),
     addCourseReview:   d  => dispatch({ type: "ADD_COURSE_REVIEW",   payload: d }),
-    addUser:           d  => dispatch({ type: "ADD_USER",            payload: d }),
+    addUser:           d  => {
+      dispatch({ type: "ADD_USER", payload: d });
+      if (isSupabaseConfigured && supabase) {
+        const parts = d.name.split(" ");
+        supabase.from("profiles").upsert({
+          id: `user-${d.email.replace(/[^a-zA-Z0-9]/g, "-")}`,
+          first_name: parts[0] || d.name,
+          last_name: parts.slice(1).join(" ") || "",
+          email: d.email,
+          role: d.role?.toLowerCase() || "student",
+          institution: d.institution || "3ITC",
+        }).then(({ error }) => { if (error) console.warn("Supabase profiles upsert error:", error); });
+      }
+    },
     updateUser:        p  => dispatch({ type: "UPDATE_USER",         payload: p }),
     deleteUser:        id => dispatch({ type: "DELETE_USER",         payload: id }),
     addInstitution:    d  => dispatch({ type: "ADD_INSTITUTION",     payload: d }),
