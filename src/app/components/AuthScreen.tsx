@@ -144,43 +144,31 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
         }
       }
 
+      // 4. Validate found user and verify password strictly
       if (foundUser) {
         if (foundUser.status === "Suspended") {
           setErrorMsg("Akun Anda sedang dinonaktifkan (Suspended). Hubungi Admin.");
           return;
         }
+        
+        // Strict password check if user has a password set
+        if (foundUser.password) {
+          if (foundUser.password !== cleanPass && foundUser.password.toLowerCase() !== cleanPass.toLowerCase()) {
+            setErrorMsg("Password yang Anda masukkan salah. Silakan periksa kembali!");
+            return;
+          }
+        }
+
         const userRole = (foundUser.role?.toLowerCase() || "student") as Role;
         syncUserProfile(foundUser.name, foundUser.institution, userRole);
         onLogin(userRole);
         return;
       }
 
-      // 4. Seamless cross-device login fallback for valid email addresses
-      if (cleanInput.includes("@")) {
-        const isDomainAdmin = cleanInput.includes("admin") || cleanInput.includes("3itc");
-        const fallbackRole: Role = isDomainAdmin ? "admin" : "student";
-        const fallbackName = cleanInput.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-        
-        actions.addUser({
-          name: fallbackName,
-          email: cleanInput,
-          role: fallbackRole,
-          institution: "3ITC Digital Education",
-          status: "Active",
-        });
-        syncUserProfile(fallbackName, "3ITC Digital Education", fallbackRole);
-        onLogin(fallbackRole);
-        return;
-      }
-
       setErrorMsg("User / Email atau password salah. Akun tidak ditemukan!");
     } catch (err) {
-      console.error("Login submit error:", err);
-      const isDomainAdmin = cleanInput.includes("admin") || cleanInput.includes("3itc");
-      const fallbackRole: Role = isDomainAdmin ? "admin" : "student";
-      const fallbackName = cleanInput.split("@")[0] || "User";
-      syncUserProfile(fallbackName, "3ITC Digital Education", fallbackRole);
-      onLogin(fallbackRole);
+      console.error("Login error:", err);
+      setErrorMsg("Terjadi kesalahan saat memproses login. Silakan coba lagi.");
     }
   };
 
