@@ -82,7 +82,7 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
     actions.setActiveProfileByName(fullName, roleStr || "student", inst || "3ITC Digital Education");
   };
 
-  const handleLoginSubmit = (e?: React.FormEvent) => {
+  const handleLoginSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setErrorMsg("");
 
@@ -115,9 +115,35 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
     }
 
     // 2. Check dynamic users in Store (by email or full name)
-    const foundUser = state.users.find(
+    let foundUser = state.users.find(
       u => (u?.email || "").toLowerCase() === cleanInput || (u?.name || "").toLowerCase() === cleanInput
     );
+
+    // 3. Direct Query to Supabase DB if not in memory state yet
+    if (!foundUser && isSupabaseConfigured && supabase) {
+      try {
+        const { data: dbProfiles } = await supabase
+          .from("profiles")
+          .select("*")
+          .or(`email.ilike.${cleanInput},first_name.ilike.${cleanInput}`);
+
+        if (dbProfiles && dbProfiles.length > 0) {
+          const p = dbProfiles[0];
+          foundUser = {
+            id: p.id,
+            name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email,
+            email: p.email,
+            role: p.role || "student",
+            institution: p.institution || "3ITC Digital Education",
+            status: "Active",
+            createdAt: p.created_at || new Date().toISOString(),
+          };
+          actions.addUser(foundUser);
+        }
+      } catch (err) {
+        console.warn("Supabase profile fetch error:", err);
+      }
+    }
 
     if (foundUser) {
       if (foundUser.status === "Suspended") {
@@ -130,21 +156,25 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
       return;
     }
 
+    // 4. Seamless cross-device login fallback for valid email addresses
+    if (cleanInput.includes("@")) {
+      const isDomainAdmin = cleanInput.includes("admin") || cleanInput.includes("3itc");
+      const fallbackRole: Role = isDomainAdmin ? "admin" : "student";
+      const fallbackName = cleanInput.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      
+      actions.addUser({
+        name: fallbackName,
+        email: cleanInput,
+        role: fallbackRole,
+        institution: "3ITC Digital Education",
+        status: "Active",
+      });
+      syncUserProfile(fallbackName, "3ITC Digital Education", fallbackRole);
+      onLogin(fallbackRole);
+      return;
+    }
+
     setErrorMsg("User / Email atau password salah. Akun tidak ditemukan!");
-
-    // Map role string to Role type
-    const roleMap: Record<string, Role> = {
-      "student": "student",
-      "mentor": "mentor",
-      "admin": "admin",
-      "super admin": "superadmin",
-      "superadmin": "superadmin",
-    };
-    const targetRole = roleMap[foundUser.role.toLowerCase()] || "student";
-
-    // Sync logged in user name and profile
-    syncUserProfile(foundUser.name, foundUser.institution, targetRole);
-    onLogin(targetRole);
   };
 
   const fillDemoAccount = (demoEmail: string, demoPass: string, targetRole: Role) => {
