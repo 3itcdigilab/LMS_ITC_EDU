@@ -1439,14 +1439,14 @@ export function EventManagement() {
                       <img src={evt.imageUrl} alt={evt.title} className="w-14 h-9 object-cover rounded-lg border border-border" />
                     ) : (
                       <div className="w-14 h-9 bg-primary/10 rounded-lg flex items-center justify-center text-primary text-xs font-bold">
-                        {evt.type[0]}
+                        {evt.type ? evt.type[0] : "W"}
                       </div>
                     )}
                   </TableCell>
                   <TableCell className="font-semibold">{evt.title}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={evt.type === "Webinar" ? "bg-blue-50 text-blue-600 border-blue-200" : "bg-purple-50 text-purple-600 border-purple-200"}>
-                      {evt.type}
+                      {evt.type || "Webinar"}
                     </Badge>
                   </TableCell>
                   <TableCell>{evt.speaker}</TableCell>
