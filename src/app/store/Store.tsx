@@ -1210,12 +1210,8 @@ const StoreContext = createContext<StoreContextType | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
+  // Initial Supabase Database Sync (No local storage reliance)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) dispatch({ type: "HYDRATE", payload: JSON.parse(saved) });
-    } catch { /* corrupt storage — start fresh */ }
-
     if (isSupabaseConfigured && supabase) {
       Promise.all([
         supabase.from("courses").select("*"),
@@ -1223,7 +1219,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from("reviews").select("*"),
         supabase.from("feed_posts").select("*"),
         supabase.from("profiles").select("*"),
-      ]).then(([coursesRes, enrollmentsRes, reviewsRes, feedsRes, profilesRes]) => {
+        supabase.from("forum_threads").select("*"),
+      ]).then(([coursesRes, enrollmentsRes, reviewsRes, feedsRes, profilesRes, forumRes]) => {
         const patch: Partial<StoreState> = {};
         if (coursesRes.data && coursesRes.data.length > 0) patch.courses = coursesRes.data as any;
         if (enrollmentsRes.data && enrollmentsRes.data.length > 0) {
@@ -1279,29 +1276,131 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             createdAt: p.created_at || new Date().toISOString(),
           }));
         }
+        if (forumRes.data && forumRes.data.length > 0) {
+          patch.forumThreads = forumRes.data.map(t => ({
+            id: t.id,
+            title: t.title,
+            body: t.body,
+            authorId: t.author_id,
+            authorName: t.author_name,
+            category: t.category,
+            pinned: t.pinned,
+            replies: t.replies || 0,
+            createdAt: t.created_at,
+          }));
+        }
         if (Object.keys(patch).length > 0) {
           dispatch({ type: "HYDRATE", payload: patch });
         }
-      }).catch(err => console.warn("Supabase initial sync:", err));
+      }).catch(err => console.warn("Supabase initial sync error:", err));
     }
   }, []);
 
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* quota */ }
-  }, [state]);
-
   const actions: StoreContextType["actions"] = {
-    updateProfile:     p  => dispatch({ type: "UPDATE_PROFILE",      payload: p }),
-    addCourse:         d  => dispatch({ type: "ADD_COURSE",          payload: d }),
-    updateCourse:      p  => dispatch({ type: "UPDATE_COURSE",       payload: p }),
-    deleteCourse:      id => dispatch({ type: "DELETE_COURSE",       payload: id }),
-    enrollCourse:      id => dispatch({ type: "ENROLL_COURSE",       payload: id }),
-    unenrollCourse:    id => dispatch({ type: "UNENROLL_COURSE",     payload: id }),
-    updateProgress:    (id, n) => dispatch({ type: "UPDATE_PROGRESS", payload: { courseId: id, progress: n } }),
-    completeLesson:    (courseId, lessonId, totalLessons) => dispatch({ type: "COMPLETE_LESSON", payload: { courseId, lessonId, totalLessons } }),
+    updateProfile: p => {
+      dispatch({ type: "UPDATE_PROFILE", payload: p });
+      if (isSupabaseConfigured && supabase && state.profile?.email) {
+        supabase.from("profiles").upsert({
+          id: `user-${state.profile.email.replace(/[^a-zA-Z0-9]/g, "-")}`,
+          first_name: p.firstName || state.profile.firstName,
+          last_name: p.lastName || state.profile.lastName,
+          email: state.profile.email,
+          institution: p.institution || state.profile.institution,
+          headline: p.headline || state.profile.headline,
+          bio: p.bio || state.profile.bio,
+        }).then(({ error }) => { if (error) console.warn("Supabase profile update error:", error); });
+      }
+    },
+    addCourse: d => {
+      dispatch({ type: "ADD_COURSE", payload: d });
+      if (isSupabaseConfigured && supabase) {
+        supabase.from("courses").insert({
+          id: `c-${Date.now()}`,
+          title: d.title,
+          subtitle: d.subtitle,
+          category: d.category,
+          level: d.level,
+          provider_institution: d.providerInstitution || "3ITC Digital Education",
+          mentor_name: d.mentorName || "Mentor 3ITC",
+          rating: d.rating || 5.0,
+          learners: d.learners || 0,
+          hours: d.hours || 10,
+          summary: d.summary || "",
+          description: d.description || "",
+          thumbnail: d.thumbnail || "",
+          price: typeof d.price === "number" ? d.price : 0,
+          status: d.status || "published",
+        }).then(({ error }) => { if (error) console.warn("Supabase addCourse error:", error); });
+      }
+    },
+    updateCourse: p => {
+      dispatch({ type: "UPDATE_COURSE", payload: p });
+      if (isSupabaseConfigured && supabase) {
+        supabase.from("courses").update({
+          title: p.title,
+          subtitle: p.subtitle,
+          category: p.category,
+          level: p.level,
+          summary: p.summary,
+          description: p.description,
+          status: p.status,
+        }).eq("id", p.id).then(({ error }) => { if (error) console.warn("Supabase updateCourse error:", error); });
+      }
+    },
+    deleteCourse: id => {
+      dispatch({ type: "DELETE_COURSE", payload: id });
+      if (isSupabaseConfigured && supabase) {
+        supabase.from("courses").delete().eq("id", id).then(({ error }) => { if (error) console.warn("Supabase deleteCourse error:", error); });
+      }
+    },
+    enrollCourse: id => {
+      dispatch({ type: "ENROLL_COURSE", payload: id });
+      if (isSupabaseConfigured && supabase) {
+        const cId = typeof id === "string" ? id : id.courseId;
+        const uKey = typeof id === "string" ? (state.profile?.email || "student") : (id.userKey || state.profile?.email || "student");
+        supabase.from("enrollments").upsert({
+          id: `enr-${cId}-${uKey.replace(/[^a-zA-Z0-9]/g, "-")}`,
+          course_id: cId,
+          user_key: uKey.toLowerCase(),
+          progress: 0,
+          completed_lessons: [],
+        }).then(({ error }) => { if (error) console.warn("Supabase enrollCourse error:", error); });
+      }
+    },
+    unenrollCourse: id => {
+      dispatch({ type: "UNENROLL_COURSE", payload: id });
+      if (isSupabaseConfigured && supabase) {
+        const cId = typeof id === "string" ? id : id.courseId;
+        const uKey = typeof id === "string" ? (state.profile?.email || "student") : (id.userKey || state.profile?.email || "student");
+        supabase.from("enrollments").delete().match({ course_id: cId, user_key: uKey.toLowerCase() }).then(({ error }) => { if (error) console.warn("Supabase unenrollCourse error:", error); });
+      }
+    },
+    updateProgress: (id, n) => {
+      dispatch({ type: "UPDATE_PROGRESS", payload: { courseId: id, progress: n } });
+      if (isSupabaseConfigured && supabase) {
+        const uKey = (state.profile?.email || "student").toLowerCase();
+        supabase.from("enrollments").update({ progress: n, last_accessed_at: new Date().toISOString() }).match({ course_id: id, user_key: uKey }).then(({ error }) => { if (error) console.warn("Supabase updateProgress error:", error); });
+      }
+    },
+    completeLesson: (courseId, lessonId, totalLessons) => {
+      dispatch({ type: "COMPLETE_LESSON", payload: { courseId, lessonId, totalLessons } });
+    },
     recordQuizAttempt: (courseId, lessonId) => dispatch({ type: "RECORD_QUIZ_ATTEMPT", payload: { courseId, lessonId } }),
-    addCourseReview:   d  => dispatch({ type: "ADD_COURSE_REVIEW",   payload: d }),
-    addUser:           d  => {
+    addCourseReview: d => {
+      dispatch({ type: "ADD_COURSE_REVIEW", payload: d });
+      if (isSupabaseConfigured && supabase) {
+        supabase.from("reviews").insert({
+          id: `rev-${Date.now()}`,
+          course_id: d.courseId,
+          user_name: d.userName,
+          user_avatar: d.userAvatar || "",
+          user_role: d.userRole || "Student",
+          rating: d.rating,
+          comment: d.comment,
+        }).then(({ error }) => { if (error) console.warn("Supabase addCourseReview error:", error); });
+      }
+    },
+    addUser: d => {
       dispatch({ type: "ADD_USER", payload: d });
       if (isSupabaseConfigured && supabase) {
         const parts = d.name.split(" ");
@@ -1312,48 +1411,90 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           email: d.email,
           role: d.role?.toLowerCase() || "student",
           institution: d.institution || "3ITC",
-        }).then(({ error }) => { if (error) console.warn("Supabase profiles upsert error:", error); });
+        }).then(({ error }) => { if (error) console.warn("Supabase addUser error:", error); });
       }
     },
-    updateUser:        p  => dispatch({ type: "UPDATE_USER",         payload: p }),
-    deleteUser:        id => dispatch({ type: "DELETE_USER",         payload: id }),
-    addInstitution:    d  => dispatch({ type: "ADD_INSTITUTION",     payload: d }),
-    updateInstitution: p  => dispatch({ type: "UPDATE_INSTITUTION",  payload: p }),
-    deleteInstitution: id => dispatch({ type: "DELETE_INSTITUTION",  payload: id }),
-    addForumThread:    d  => dispatch({ type: "ADD_FORUM_THREAD",    payload: d }),
+    updateUser: p => dispatch({ type: "UPDATE_USER", payload: p }),
+    deleteUser: id => {
+      dispatch({ type: "DELETE_USER", payload: id });
+      if (isSupabaseConfigured && supabase) {
+        supabase.from("profiles").delete().eq("id", id).then(({ error }) => { if (error) console.warn("Supabase deleteUser error:", error); });
+      }
+    },
+    addInstitution: d => dispatch({ type: "ADD_INSTITUTION", payload: d }),
+    updateInstitution: p => dispatch({ type: "UPDATE_INSTITUTION", payload: p }),
+    deleteInstitution: id => dispatch({ type: "DELETE_INSTITUTION", payload: id }),
+    addForumThread: d => {
+      dispatch({ type: "ADD_FORUM_THREAD", payload: d });
+      if (isSupabaseConfigured && supabase) {
+        supabase.from("forum_threads").insert({
+          id: `thread-${Date.now()}`,
+          title: d.title,
+          body: d.body,
+          author_id: d.authorId,
+          author_name: d.authorName,
+          category: d.category || "Programming",
+        }).then(({ error }) => { if (error) console.warn("Supabase addForumThread error:", error); });
+      }
+    },
     deleteForumThread: id => dispatch({ type: "DELETE_FORUM_THREAD", payload: id }),
-    addEvent:          d  => dispatch({ type: "ADD_EVENT",           payload: d }),
-    updateEvent:       d  => dispatch({ type: "UPDATE_EVENT",        payload: d }),
-    deleteEvent:       id => dispatch({ type: "DELETE_EVENT",        payload: id }),
-    registerEvent:     id => dispatch({ type: "REGISTER_EVENT",      payload: id }),
-    addPortfolio:      d  => dispatch({ type: "ADD_PORTFOLIO",       payload: d }),
-    updatePortfolio:   p  => dispatch({ type: "UPDATE_PORTFOLIO",    payload: p }),
-    deletePortfolio:   id => dispatch({ type: "DELETE_PORTFOLIO",    payload: id }),
-    addCertificate:    d  => dispatch({ type: "ADD_CERTIFICATE",     payload: d }),
-    updateLanding:     p  => dispatch({ type: "UPDATE_LANDING",      payload: p }),
-    addFeedPost:       d  => dispatch({ type: "ADD_FEED_POST",       payload: d }),
-    repostFeedPost:    d  => dispatch({ type: "REPOST_FEED_POST",    payload: d }),
-    likeFeedPost:      (postId, userEmail) => dispatch({ type: "LIKE_FEED_POST", payload: { postId, userEmail } }),
-    addFeedComment:    (postId, authorName, text) => dispatch({ type: "ADD_FEED_COMMENT", payload: { postId, authorName, text } }),
-    toggleFriend:        targetId => dispatch({ type: "TOGGLE_FRIEND", payload: targetId }),
-    sendFriendRequest:   d => dispatch({ type: "SEND_FRIEND_REQUEST", payload: d }),
+    addEvent: d => dispatch({ type: "ADD_EVENT", payload: d }),
+    updateEvent: d => dispatch({ type: "UPDATE_EVENT", payload: d }),
+    deleteEvent: id => dispatch({ type: "DELETE_EVENT", payload: id }),
+    registerEvent: id => dispatch({ type: "REGISTER_EVENT", payload: id }),
+    addPortfolio: d => dispatch({ type: "ADD_PORTFOLIO", payload: d }),
+    updatePortfolio: p => dispatch({ type: "UPDATE_PORTFOLIO", payload: p }),
+    deletePortfolio: id => dispatch({ type: "DELETE_PORTFOLIO", payload: id }),
+    addCertificate: d => dispatch({ type: "ADD_CERTIFICATE", payload: d }),
+    updateLanding: p => dispatch({ type: "UPDATE_LANDING", payload: p }),
+    addFeedPost: d => {
+      dispatch({ type: "ADD_FEED_POST", payload: d });
+      if (isSupabaseConfigured && supabase) {
+        supabase.from("feed_posts").insert({
+          id: `feed-${Date.now()}`,
+          author_id: d.authorId,
+          author_name: d.authorName,
+          author_role: d.authorRole || "Student",
+          author_avatar: d.authorAvatar || "",
+          content: d.content,
+          image_url: d.imageUrl || "",
+        }).then(({ error }) => { if (error) console.warn("Supabase addFeedPost error:", error); });
+      }
+    },
+    repostFeedPost: d => {
+      dispatch({ type: "REPOST_FEED_POST", payload: d });
+      if (isSupabaseConfigured && supabase) {
+        supabase.from("feed_posts").insert({
+          id: `repost-${Date.now()}`,
+          author_id: d.authorId,
+          author_name: d.authorName,
+          author_role: d.authorRole || "Student",
+          author_avatar: d.authorAvatar || "",
+          content: d.commentary || "",
+        }).then(({ error }) => { if (error) console.warn("Supabase repostFeedPost error:", error); });
+      }
+    },
+    likeFeedPost: (postId, userEmail) => dispatch({ type: "LIKE_FEED_POST", payload: { postId, userEmail } }),
+    addFeedComment: (postId, authorName, text) => dispatch({ type: "ADD_FEED_COMMENT", payload: { postId, authorName, text } }),
+    toggleFriend: targetId => dispatch({ type: "TOGGLE_FRIEND", payload: targetId }),
+    sendFriendRequest: d => dispatch({ type: "SEND_FRIEND_REQUEST", payload: d }),
     acceptFriendRequest: (requestId, currentUserName) => dispatch({ type: "ACCEPT_FRIEND_REQUEST", payload: { requestId, currentUserName } }),
     rejectFriendRequest: requestId => dispatch({ type: "REJECT_FRIEND_REQUEST", payload: { requestId } }),
-    removeFriend:        (user1, user2) => dispatch({ type: "REMOVE_FRIEND", payload: { user1, user2 } }),
-    markNotificationRead:notifId => dispatch({ type: "MARK_NOTIFICATION_READ", payload: notifId }),
+    removeFriend: (user1, user2) => dispatch({ type: "REMOVE_FRIEND", payload: { user1, user2 } }),
+    markNotificationRead: notifId => dispatch({ type: "MARK_NOTIFICATION_READ", payload: notifId }),
     markAllNotificationsRead: userKey => dispatch({ type: "MARK_ALL_NOTIFICATIONS_READ", payload: userKey }),
-    deleteNotification:  notifId => dispatch({ type: "DELETE_NOTIFICATION", payload: notifId }),
+    deleteNotification: notifId => dispatch({ type: "DELETE_NOTIFICATION", payload: notifId }),
     clearAllNotifications: userKey => dispatch({ type: "CLEAR_ALL_NOTIFICATIONS", payload: userKey }),
     setActiveProfileByName: (name, defaultRole, institution) => dispatch({ type: "SET_ACTIVE_PROFILE_BY_NAME", payload: { name, defaultRole, institution } }),
-    updateFeedPost:    p => dispatch({ type: "UPDATE_FEED_POST", payload: p }),
-    deleteFeedPost:    id => dispatch({ type: "DELETE_FEED_POST", payload: id }),
-    addBadge:          d => dispatch({ type: "ADD_BADGE", payload: d }),
-    updateBadge:       p => dispatch({ type: "UPDATE_BADGE", payload: p }),
-    deleteBadge:       id => dispatch({ type: "DELETE_BADGE", payload: id }),
-    awardUserBadge:    (badgeId, targetUserKey) => dispatch({ type: "AWARD_USER_BADGE", payload: { badgeId, targetUserKey } }),
-    setFeaturedBadge:  badgeId => dispatch({ type: "SET_FEATURED_BADGE", payload: { badgeId } }),
-    addNotification:   d => dispatch({ type: "ADD_NOTIFICATION", payload: d }),
-    addForumReply:     (threadId, reply) => dispatch({ type: "ADD_FORUM_REPLY", payload: { threadId, reply } }),
+    updateFeedPost: p => dispatch({ type: "UPDATE_FEED_POST", payload: p }),
+    deleteFeedPost: id => dispatch({ type: "DELETE_FEED_POST", payload: id }),
+    addBadge: d => dispatch({ type: "ADD_BADGE", payload: d }),
+    updateBadge: p => dispatch({ type: "UPDATE_BADGE", payload: p }),
+    deleteBadge: id => dispatch({ type: "DELETE_BADGE", payload: id }),
+    awardUserBadge: (badgeId, targetUserKey) => dispatch({ type: "AWARD_USER_BADGE", payload: { badgeId, targetUserKey } }),
+    setFeaturedBadge: badgeId => dispatch({ type: "SET_FEATURED_BADGE", payload: { badgeId } }),
+    addNotification: d => dispatch({ type: "ADD_NOTIFICATION", payload: d }),
+    addForumReply: (threadId, reply) => dispatch({ type: "ADD_FORUM_REPLY", payload: { threadId, reply } }),
     updateForumThread: p => dispatch({ type: "UPDATE_FORUM_THREAD", payload: p }),
   };
 
