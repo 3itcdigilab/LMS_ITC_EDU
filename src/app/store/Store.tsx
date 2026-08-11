@@ -1,13 +1,12 @@
 /**
  * 3ITC Digital Education — Central Store
- * Context + useReducer → localStorage → (nanti: REST API / database)
+ * Context + useReducer → Firestore (primary DB) + localStorage (offline cache)
  */
 
 import { createContext, useContext, useReducer, useEffect, type ReactNode } from "react";
 import { type Role } from "../data/mock";
-import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import { db } from "../lib/firebase";
-import { collection, doc, setDoc, deleteDoc, getDocs, onSnapshot } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 
 // ─── Curriculum content types ─────────────────────────────────────────────────
 
@@ -1241,209 +1240,257 @@ const StoreContext = createContext<StoreContextType | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Initial Sync from localStorage Cache & Supabase Database
+  // ─── Firestore Real-time Sync (Primary DB) + localStorage offline cache ───
   useEffect(() => {
-    // 1. Restore local cache for users and institutions
-    let cachedUsers: UserAccount[] = [];
-    let cachedInstitutions: Institution[] = [];
-    try {
-      const uRaw = localStorage.getItem("3itc_users_cache");
-      if (uRaw) cachedUsers = JSON.parse(uRaw);
-      const iRaw = localStorage.getItem("3itc_institutions_cache");
-      if (iRaw) cachedInstitutions = JSON.parse(iRaw);
-    } catch (e) {
-      console.warn("Cache load warning:", e);
-    }
+    // Helper: save to localStorage as offline cache
+    const cacheSet = (key: string, data: any) => {
+      try { localStorage.setItem(key, JSON.stringify(data)); } catch (_) {}
+    };
+    const cacheGet = (key: string) => {
+      try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : null; } catch (_) { return null; }
+    };
 
-    if (cachedUsers.length > 0 || cachedInstitutions.length > 0) {
+    // Load offline cache immediately so UI is never empty on first paint
+    const cachedUsers = cacheGet("3itc_users_cache");
+    const cachedInstitutions = cacheGet("3itc_institutions_cache");
+    if (cachedUsers?.length || cachedInstitutions?.length) {
       const patch: Partial<StoreState> = {};
-      if (cachedUsers.length > 0) patch.users = cachedUsers;
-      if (cachedInstitutions.length > 0) patch.institutions = cachedInstitutions;
+      if (cachedUsers?.length) patch.users = cachedUsers;
+      if (cachedInstitutions?.length) patch.institutions = cachedInstitutions;
       dispatch({ type: "HYDRATE", payload: patch });
     }
 
-    // 2. Fetch profiles from Supabase DB to merge remote profiles
-    if (isSupabaseConfigured && supabase) {
-      supabase.from("profiles").select("*").then(({ data: profilesData }) => {
-        if (profilesData && profilesData.length > 0) {
-          const dbUsers: UserAccount[] = profilesData.map(p => ({
-            id: p.id,
-            name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email,
-            email: p.email,
-            password: p.password || "gaadapasswordnya",
-            role: p.role || "student",
-            institution: p.institution || "3ITC Digital Education",
-            status: "Active",
-            createdAt: p.created_at || new Date().toISOString(),
-          }));
-          dispatch({ type: "HYDRATE", payload: { users: dbUsers } });
-          try {
-            localStorage.setItem("3itc_users_cache", JSON.stringify(dbUsers));
-          } catch (err) {}
-        }
-      }).catch(err => console.warn("Supabase profiles sync warning:", err));
-    }
+    // Real-time Firestore listeners — when Firestore is available, these override the cache
+    const unsubProfiles = onSnapshot(collection(db, "profiles"), (snap) => {
+      if (!snap.empty) {
+        const users = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+        dispatch({ type: "HYDRATE", payload: { users } });
+        cacheSet("3itc_users_cache", users);
+      }
+    }, err => console.warn("Firestore profiles listener:", err));
+
+    const unsubInstitutions = onSnapshot(collection(db, "institutions"), (snap) => {
+      if (!snap.empty) {
+        const institutions = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+        dispatch({ type: "HYDRATE", payload: { institutions } });
+        cacheSet("3itc_institutions_cache", institutions);
+      }
+    }, err => console.warn("Firestore institutions listener:", err));
+
+    const unsubCourses = onSnapshot(collection(db, "courses"), (snap) => {
+      if (!snap.empty) {
+        const courses = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+        dispatch({ type: "HYDRATE", payload: { courses } });
+      }
+    }, err => console.warn("Firestore courses listener:", err));
+
+    const unsubEnrollments = onSnapshot(collection(db, "enrollments"), (snap) => {
+      if (!snap.empty) {
+        const enrollments = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+        dispatch({ type: "HYDRATE", payload: { enrollments } });
+      }
+    }, err => console.warn("Firestore enrollments listener:", err));
+
+    const unsubReviews = onSnapshot(collection(db, "reviews"), (snap) => {
+      if (!snap.empty) {
+        const reviews = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+        dispatch({ type: "HYDRATE", payload: { reviews } });
+      }
+    }, err => console.warn("Firestore reviews listener:", err));
+
+    const unsubFeed = onSnapshot(collection(db, "feedPosts"), (snap) => {
+      if (!snap.empty) {
+        const feedPosts = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+        dispatch({ type: "HYDRATE", payload: { feedPosts } });
+      }
+    }, err => console.warn("Firestore feedPosts listener:", err));
+
+    const unsubForum = onSnapshot(collection(db, "forumThreads"), (snap) => {
+      if (!snap.empty) {
+        const forumThreads = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+        dispatch({ type: "HYDRATE", payload: { forumThreads } });
+      }
+    }, err => console.warn("Firestore forumThreads listener:", err));
+
+    return () => {
+      unsubProfiles(); unsubInstitutions(); unsubCourses();
+      unsubEnrollments(); unsubReviews(); unsubFeed(); unsubForum();
+    };
   }, []);
 
+  // ─── Helper: write to Firestore ───
+  const fsSet = (col: string, id: string, data: any) =>
+    setDoc(doc(db, col, id), data, { merge: true }).catch(e => console.warn(`Firestore ${col} write error:`, e));
+  const fsDel = (col: string, id: string) =>
+    deleteDoc(doc(db, col, id)).catch(e => console.warn(`Firestore ${col} delete error:`, e));
+
   const actions: StoreContextType["actions"] = {
+    // ── Profile ──
     updateProfile: p => {
       dispatch({ type: "UPDATE_PROFILE", payload: p });
-      if (isSupabaseConfigured && supabase && state.profile?.email) {
-        supabase.from("profiles").upsert({
-          id: `user-${state.profile.email.replace(/[^a-zA-Z0-9]/g, "-")}`,
-          first_name: p.firstName || state.profile.firstName,
-          last_name: p.lastName || state.profile.lastName,
+      if (state.profile?.email) {
+        const uId = `user-${state.profile.email.replace(/[^a-zA-Z0-9]/g, "-")}`;
+        fsSet("profiles", uId, {
+          name: `${p.firstName || state.profile.firstName || ""} ${p.lastName || state.profile.lastName || ""}`.trim(),
           email: state.profile.email,
           institution: p.institution || state.profile.institution,
           headline: p.headline || state.profile.headline,
           bio: p.bio || state.profile.bio,
-        }).then(({ error }) => { if (error) console.warn("Supabase profile update error:", error); });
+        });
       }
     },
+
+    // ── Courses ──
     addCourse: d => {
+      const cId = `c-${Date.now()}`;
       dispatch({ type: "ADD_COURSE", payload: d });
+      fsSet("courses", cId, {
+        title: d.title, subtitle: d.subtitle, category: d.category, level: d.level,
+        providerInstitution: d.providerInstitution || "3ITC Digital Education",
+        mentorName: d.mentorName || "Mentor 3ITC",
+        rating: d.rating || 5.0, learners: d.learners || 0, hours: d.hours || 10,
+        summary: d.summary || "", description: d.description || "",
+        thumbnail: d.thumbnail || "", price: typeof d.price === "number" ? d.price : 0,
+        status: d.status || "published",
+      });
     },
     updateCourse: p => {
       dispatch({ type: "UPDATE_COURSE", payload: p });
+      fsSet("courses", p.id, p);
     },
     deleteCourse: id => {
       dispatch({ type: "DELETE_COURSE", payload: id });
+      fsDel("courses", id);
     },
+
+    // ── Enrollments ──
     enrollCourse: id => {
       dispatch({ type: "ENROLL_COURSE", payload: id });
+      const cId = typeof id === "string" ? id : id.courseId;
+      const uKey = typeof id === "string" ? (state.profile?.email || "student") : (id.userKey || state.profile?.email || "student");
+      const eId = `enr-${cId}-${uKey.replace(/[^a-zA-Z0-9]/g, "-")}`;
+      fsSet("enrollments", eId, {
+        courseId: cId, userKey: uKey.toLowerCase(),
+        progress: 0, completedLessons: [], enrolledAt: new Date().toISOString(),
+      });
     },
     unenrollCourse: id => {
       dispatch({ type: "UNENROLL_COURSE", payload: id });
+      const cId = typeof id === "string" ? id : id.courseId;
+      const uKey = typeof id === "string" ? (state.profile?.email || "student") : (id.userKey || state.profile?.email || "student");
+      fsDel("enrollments", `enr-${cId}-${uKey.replace(/[^a-zA-Z0-9]/g, "-")}`);
     },
     updateProgress: (id, n) => {
       dispatch({ type: "UPDATE_PROGRESS", payload: { courseId: id, progress: n } });
+      const uKey = (state.profile?.email || "student").toLowerCase();
+      fsSet("enrollments", `enr-${id}-${uKey.replace(/[^a-zA-Z0-9]/g, "-")}`, {
+        progress: n, lastAccessedAt: new Date().toISOString(),
+      });
     },
     completeLesson: (courseId, lessonId, totalLessons) => {
       dispatch({ type: "COMPLETE_LESSON", payload: { courseId, lessonId, totalLessons } });
     },
     recordQuizAttempt: (courseId, lessonId) => dispatch({ type: "RECORD_QUIZ_ATTEMPT", payload: { courseId, lessonId } }),
+
+    // ── Reviews ──
     addCourseReview: d => {
       dispatch({ type: "ADD_COURSE_REVIEW", payload: d });
+      fsSet("reviews", `rev-${Date.now()}`, {
+        courseId: d.courseId, userName: d.userName,
+        userAvatar: d.userAvatar || "", userRole: d.userRole || "Student",
+        rating: d.rating, comment: d.comment, createdAt: new Date().toISOString(),
+      });
     },
+
+    // ── Users (profiles) ──
     addUser: d => {
       dispatch({ type: "ADD_USER", payload: d });
-      const newUser: UserAccount = {
-        id: d.id || `user-${Date.now()}`,
-        name: d.name,
-        email: d.email,
+      const uId = d.id || `user-${d.email.replace(/[^a-zA-Z0-9]/g, "-")}`;
+      fsSet("profiles", uId, {
+        id: uId, name: d.name, email: d.email,
         password: d.password || "gaadapasswordnya",
-        role: d.role || "student",
+        role: d.role?.toLowerCase() || "student",
         institution: d.institution || "3ITC Digital Education",
         status: d.status || "Active",
         createdAt: d.createdAt || new Date().toISOString(),
-      };
-      const updatedUsers = [...state.users.filter(u => u.email !== d.email), newUser];
-      try {
-        localStorage.setItem("3itc_users_cache", JSON.stringify(updatedUsers));
-      } catch (e) {}
-
-      if (isSupabaseConfigured && supabase) {
-        const parts = d.name.split(" ");
-        supabase.from("profiles").upsert({
-          id: newUser.id,
-          first_name: parts[0] || d.name,
-          last_name: parts.slice(1).join(" ") || "",
-          email: d.email,
-          password: d.password || "gaadapasswordnya",
-          role: d.role?.toLowerCase() || "student",
-          institution: d.institution || "3ITC Digital Education",
-        }).then(({ error }) => { if (error) console.warn("Supabase addUser error:", error); });
-      }
+      });
     },
     updateUser: p => {
       dispatch({ type: "UPDATE_USER", payload: p });
-      const updatedUsers = state.users.map(u => u.id === p.id ? { ...u, ...p } : u);
-      try {
-        localStorage.setItem("3itc_users_cache", JSON.stringify(updatedUsers));
-      } catch (e) {}
+      fsSet("profiles", p.id, p);
     },
     deleteUser: id => {
       dispatch({ type: "DELETE_USER", payload: id });
-      const updatedUsers = state.users.filter(u => u.id !== id);
-      try {
-        localStorage.setItem("3itc_users_cache", JSON.stringify(updatedUsers));
-      } catch (e) {}
-      if (isSupabaseConfigured && supabase) {
-        supabase.from("profiles").delete().eq("id", id).then(({ error }) => { if (error) console.warn("Supabase deleteUser error:", error); });
-      }
+      fsDel("profiles", id);
     },
+
+    // ── Institutions ──
     addInstitution: d => {
       dispatch({ type: "ADD_INSTITUTION", payload: d });
-      const newInst: Institution = {
-        id: `inst-${Date.now()}`,
-        name: d.name,
-        type: d.type || "Other",
-        region: d.region || "Jakarta",
-        plan: d.plan || "Free",
-        status: d.status || "Active",
-        students: d.students || 0,
-        teachers: d.teachers || 0,
+      const instId = `inst-${Date.now()}`;
+      fsSet("institutions", instId, {
+        name: d.name, type: d.type || "Other", region: d.region || "Jakarta",
+        plan: d.plan || "Free", status: d.status || "Active",
+        students: d.students || 0, teachers: d.teachers || 0,
         createdAt: new Date().toISOString(),
-      };
-      const updatedInsts = [...state.institutions, newInst];
-      try {
-        localStorage.setItem("3itc_institutions_cache", JSON.stringify(updatedInsts));
-      } catch (e) {}
+      });
     },
     updateInstitution: p => {
       dispatch({ type: "UPDATE_INSTITUTION", payload: p });
-      const updatedInsts = state.institutions.map(i => i.id === p.id ? { ...i, ...p } : i);
-      try {
-        localStorage.setItem("3itc_institutions_cache", JSON.stringify(updatedInsts));
-      } catch (e) {}
+      fsSet("institutions", p.id, p);
     },
     deleteInstitution: id => {
       dispatch({ type: "DELETE_INSTITUTION", payload: id });
-      const updatedInsts = state.institutions.filter(i => i.id !== id);
-      try {
-        localStorage.setItem("3itc_institutions_cache", JSON.stringify(updatedInsts));
-      } catch (e) {}
+      fsDel("institutions", id);
     },
+
+    // ── Forum ──
     addForumThread: d => {
       dispatch({ type: "ADD_FORUM_THREAD", payload: d });
+      fsSet("forumThreads", `thread-${Date.now()}`, {
+        title: d.title, body: d.body, authorId: d.authorId,
+        authorName: d.authorName, category: d.category || "Programming",
+        createdAt: new Date().toISOString(),
+      });
     },
     deleteForumThread: id => {
       dispatch({ type: "DELETE_FORUM_THREAD", payload: id });
+      fsDel("forumThreads", id);
     },
+
+    // ── Events (local only for now) ──
     addEvent: d => dispatch({ type: "ADD_EVENT", payload: d }),
     updateEvent: d => dispatch({ type: "UPDATE_EVENT", payload: d }),
     deleteEvent: id => dispatch({ type: "DELETE_EVENT", payload: id }),
     registerEvent: id => dispatch({ type: "REGISTER_EVENT", payload: id }),
+
+    // ── Portfolio & Certificates (local only) ──
     addPortfolio: d => dispatch({ type: "ADD_PORTFOLIO", payload: d }),
     updatePortfolio: p => dispatch({ type: "UPDATE_PORTFOLIO", payload: p }),
     deletePortfolio: id => dispatch({ type: "DELETE_PORTFOLIO", payload: id }),
     addCertificate: d => dispatch({ type: "ADD_CERTIFICATE", payload: d }),
     updateLanding: p => dispatch({ type: "UPDATE_LANDING", payload: p }),
+
+    // ── Feed Posts ──
     addFeedPost: d => {
       dispatch({ type: "ADD_FEED_POST", payload: d });
-      const postId = `feed-${Date.now()}`;
-      setDoc(doc(db, "feedPosts", postId), {
-        authorId: d.authorId,
-        authorName: d.authorName,
-        authorRole: d.authorRole || "Student",
-        authorAvatar: d.authorAvatar || "",
-        content: d.content,
-        imageUrl: d.imageUrl || "",
+      fsSet("feedPosts", `feed-${Date.now()}`, {
+        authorId: d.authorId, authorName: d.authorName,
+        authorRole: d.authorRole || "Student", authorAvatar: d.authorAvatar || "",
+        content: d.content, imageUrl: d.imageUrl || "",
         createdAt: new Date().toISOString(),
-      }, { merge: true }).catch(err => console.warn("Firestore addFeedPost error:", err));
+      });
     },
     repostFeedPost: d => {
       dispatch({ type: "REPOST_FEED_POST", payload: d });
-      const postId = `repost-${Date.now()}`;
-      setDoc(doc(db, "feedPosts", postId), {
-        authorId: d.authorId,
-        authorName: d.authorName,
-        authorRole: d.authorRole || "Student",
-        authorAvatar: d.authorAvatar || "",
-        content: d.commentary || "",
-        createdAt: new Date().toISOString(),
-      }, { merge: true }).catch(err => console.warn("Firestore repostFeedPost error:", err));
+      fsSet("feedPosts", `repost-${Date.now()}`, {
+        authorId: d.authorId, authorName: d.authorName,
+        authorRole: d.authorRole || "Student", authorAvatar: d.authorAvatar || "",
+        content: d.commentary || "", createdAt: new Date().toISOString(),
+      });
     },
+
+    // ── Social (local only) ──
     likeFeedPost: (postId, userEmail) => dispatch({ type: "LIKE_FEED_POST", payload: { postId, userEmail } }),
     addFeedComment: (postId, authorName, text) => dispatch({ type: "ADD_FEED_COMMENT", payload: { postId, authorName, text } }),
     toggleFriend: targetId => dispatch({ type: "TOGGLE_FRIEND", payload: targetId }),
