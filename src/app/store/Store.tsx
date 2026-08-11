@@ -588,50 +588,52 @@ function reducer(state: StoreState, action: Action): StoreState {
   switch (action.type) {
     case "HYDRATE": {
       const payload = action.payload || {};
-      // Migrate old string price to number and safely process courses
-      const courses = (Array.isArray(payload.courses) ? payload.courses : []).map(c => ({
-        ...(c || {}),
-        price: typeof c?.price === "string"
-          ? (c.price === "Free" ? 0 : parseInt((c.price as unknown as string).replace(/\D/g, ""), 10) * 1000 || 0)
-          : (c?.price ?? 0),
-        discountPercent: c?.discountPercent ?? 0,
-        curriculum: (Array.isArray(c?.curriculum) ? c.curriculum : []).map(mod => ({
-          ...(mod || {}),
-          lessons: (Array.isArray(mod?.lessons) ? mod.lessons : []).map(l => ({
-            ...(l || {}),
-            kkm: l?.kkm ?? 0,
-            maxAttempts: l?.maxAttempts ?? 0,
-          })),
-        })),
-      }));
-      const enrollments = (Array.isArray(payload.enrollments) ? payload.enrollments : []).map(e => ({
-        ...(e || {}),
-        quizAttempts: e?.quizAttempts || {},
-      }));
-      // Safely merge profile with defaults to prevent crashes on undefined arrays
-      const profile = { ...defaultProfile, ...(payload.profile || {}) };
-      const institutions = Array.isArray(payload.institutions) ? payload.institutions : [];
-      const badges = Array.isArray(payload.badges) ? payload.badges : [];
-      const feedPosts = Array.isArray(payload.feedPosts) ? payload.feedPosts : [];
-      const friendConnections = Array.isArray(payload.friendConnections) ? payload.friendConnections : [];
-      const friendRequests = Array.isArray(payload.friendRequests) ? payload.friendRequests : [];
-      const userNotifications = Array.isArray(payload.userNotifications) ? payload.userNotifications : [];
-      const userProfilesMap = payload.userProfilesMap && typeof payload.userProfilesMap === "object" ? payload.userProfilesMap : {};
+      // Only override fields that are actually present in the payload.
+      // This prevents one onSnapshot (e.g. profiles) from wiping other collections (e.g. institutions).
+      const merged = { ...state };
 
-      return {
-        ...initialState,
-        ...payload,
-        courses,
-        enrollments,
-        profile,
-        institutions,
-        badges,
-        feedPosts,
-        friendConnections,
-        friendRequests,
-        userNotifications,
-        userProfilesMap,
-      };
+      if (Array.isArray(payload.users) && payload.users.length > 0) {
+        merged.users = payload.users;
+      }
+      if (Array.isArray(payload.institutions) && payload.institutions.length > 0) {
+        merged.institutions = payload.institutions;
+      }
+      if (Array.isArray(payload.courses)) {
+        merged.courses = payload.courses.map(c => ({
+          ...(c || {}),
+          price: typeof c?.price === "string"
+            ? (c.price === "Free" ? 0 : parseInt((c.price as unknown as string).replace(/\D/g, ""), 10) * 1000 || 0)
+            : (c?.price ?? 0),
+          discountPercent: c?.discountPercent ?? 0,
+          curriculum: (Array.isArray(c?.curriculum) ? c.curriculum : []).map(mod => ({
+            ...(mod || {}),
+            lessons: (Array.isArray(mod?.lessons) ? mod.lessons : []).map(l => ({
+              ...(l || {}),
+              kkm: l?.kkm ?? 0,
+              maxAttempts: l?.maxAttempts ?? 0,
+            })),
+          })),
+        }));
+      }
+      if (Array.isArray(payload.enrollments)) {
+        merged.enrollments = payload.enrollments.map(e => ({
+          ...(e || {}),
+          quizAttempts: e?.quizAttempts || {},
+        }));
+      }
+      if (payload.profile) {
+        merged.profile = { ...defaultProfile, ...(payload.profile || {}) };
+      }
+      if (Array.isArray(payload.badges)) merged.badges = payload.badges;
+      if (Array.isArray(payload.feedPosts)) merged.feedPosts = payload.feedPosts;
+      if (Array.isArray(payload.forumThreads)) merged.forumThreads = payload.forumThreads;
+      if (Array.isArray(payload.reviews)) merged.reviews = payload.reviews;
+      if (Array.isArray(payload.friendConnections)) merged.friendConnections = payload.friendConnections;
+      if (Array.isArray(payload.friendRequests)) merged.friendRequests = payload.friendRequests;
+      if (Array.isArray(payload.userNotifications)) merged.userNotifications = payload.userNotifications;
+      if (payload.userProfilesMap && typeof payload.userProfilesMap === "object") merged.userProfilesMap = payload.userProfilesMap;
+
+      return merged;
     }
     case "UPDATE_PROFILE": {
       const updatedProfile = { ...state.profile, ...action.payload };
@@ -1261,9 +1263,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
 
     // Real-time Firestore listeners — when Firestore is available, these override the cache
+    const capitalizeRole = (r: string) => r ? r.charAt(0).toUpperCase() + r.slice(1).toLowerCase() : "Student";
     const unsubProfiles = onSnapshot(collection(db, "profiles"), (snap) => {
       if (!snap.empty) {
-        const users = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+        const users = snap.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            name: data.name || `${data.first_name || ""} ${data.last_name || ""}`.trim() || data.email || "",
+            email: data.email || "",
+            password: data.password || "gaadapasswordnya",
+            role: capitalizeRole(data.role || "student"),
+            institution: data.institution || "3ITC Digital Education",
+            status: data.status || "Active",
+            createdAt: data.createdAt || data.created_at || new Date().toISOString(),
+          };
+        });
         dispatch({ type: "HYDRATE", payload: { users } });
         cacheSet("3itc_users_cache", users);
       }
