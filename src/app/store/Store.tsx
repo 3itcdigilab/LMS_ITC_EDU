@@ -669,6 +669,7 @@ function reducer(state: StoreState, action: Action): StoreState {
       if (payload.profile) {
         merged.profile = { ...defaultProfile, ...(payload.profile || {}) };
       }
+      if (Array.isArray(payload.events)) merged.events = payload.events;
       if (Array.isArray(payload.badges)) merged.badges = payload.badges;
       if (Array.isArray(payload.feedPosts)) merged.feedPosts = payload.feedPosts;
       if (Array.isArray(payload.forumThreads)) merged.forumThreads = payload.forumThreads;
