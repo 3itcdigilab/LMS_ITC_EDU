@@ -560,85 +560,172 @@ function CourseDetail({ course, onBack, onNavigate }: { course: Course; onBack: 
                 <div><h4 className="font-medium text-secondary mb-2">Tentang mentor</h4><p className="text-sm text-muted-foreground">{course.mentorBio}</p></div>
               )}
             </TabsContent>
-            <TabsContent value="reviews" className="mt-4">
+            <TabsContent value="reviews" className="mt-4 space-y-4">
               {(() => {
                 const courseReviews = (state.reviews || []).filter(r => r.courseId === course.id);
-                if (courseReviews.length === 0) {
-                  return (
-                    <EmptyState
-                      icon={<MessageSquare className="size-6" />}
-                      title="Belum ada ulasan"
-                      description="Jadilah yang pertama memberikan ulasan setelah menyelesaikan kursus."
-                    />
-                  );
-                }
-
-                const avgRating = (courseReviews.reduce((s, r) => s + r.rating, 0) / courseReviews.length).toFixed(1);
+                const avgRating = courseReviews.length > 0 ? (courseReviews.reduce((s, r) => s + r.rating, 0) / courseReviews.length).toFixed(1) : "0.0";
                 const starCounts = [5, 4, 3, 2, 1].map(star => ({
                   star,
                   count: courseReviews.filter(r => r.rating === star).length,
-                  percent: Math.round((courseReviews.filter(r => r.rating === star).length / courseReviews.length) * 100),
+                  percent: courseReviews.length > 0 ? Math.round((courseReviews.filter(r => r.rating === star).length / courseReviews.length) * 100) : 0,
                 }));
+
+                const handleAddReviewSubmit = () => {
+                  if (!newComment.trim()) {
+                    toast.error("Silakan tulis isi ulasan terlebih dahulu!");
+                    return;
+                  }
+                  const authorName = `${state.profile?.firstName || ""} ${state.profile?.lastName || ""}`.trim() || "Pelajar 3ITC";
+                  actions.addCourseReview({
+                    courseId: course.id,
+                    userName: authorName,
+                    userAvatar: state.profile?.avatarUrl || "",
+                    userRole: state.profile?.headline || "Student",
+                    rating: newRating,
+                    comment: newComment.trim(),
+                  });
+                  toast.success("Ulasan berhasil dikirim dan tersimpan di Cloud Database Firestore! ⭐");
+                  setNewComment("");
+                  setShowWriteReview(false);
+                };
 
                 return (
                   <div className="space-y-6">
-                    {/* Rating Summary Header */}
-                    <Card className="p-6 bg-gradient-to-br from-card via-card to-amber-500/5 border-border">
-                      <div className="flex flex-col sm:flex-row items-center gap-6">
-                        <div className="text-center sm:text-left shrink-0">
-                          <div className="text-5xl font-black text-foreground">{avgRating}</div>
-                          <div className="flex items-center justify-center sm:justify-start gap-1 my-1 text-amber-400">
-                            {[1, 2, 3, 4, 5].map(s => (
-                              <Star key={s} className={cn("size-4 fill-current", s <= Math.round(Number(avgRating)) ? "text-amber-400" : "text-muted-foreground/30")} />
-                            ))}
-                          </div>
-                          <p className="text-xs text-muted-foreground">{courseReviews.length} Ulasan Pelajar</p>
-                        </div>
-
-                        <div className="flex-1 w-full space-y-1.5 border-t sm:border-t-0 sm:border-l border-border pt-4 sm:pt-0 sm:pl-6">
-                          {starCounts.map(({ star, count, percent }) => (
-                            <div key={star} className="flex items-center gap-2 text-xs">
-                              <span className="w-12 text-muted-foreground font-medium flex items-center gap-1">
-                                {star} <Star className="size-3 text-amber-400 fill-amber-400" />
-                              </span>
-                              <Progress value={percent} className="h-2 flex-1" />
-                              <span className="w-8 text-right text-muted-foreground">{count}</span>
-                            </div>
-                          ))}
-                        </div>
+                    {/* Header Action Bar */}
+                    <div className="flex items-center justify-between bg-muted/40 p-4 rounded-xl border border-border">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="size-4 text-amber-500" />
+                        <span className="text-sm font-bold text-foreground">Ulasan & Rating Pelajar</span>
+                        <Badge variant="outline" className="text-xs border-emerald-500/40 text-emerald-500 bg-emerald-500/10">
+                          🔥 Cloud Firestore DB Active
+                        </Badge>
                       </div>
-                    </Card>
+                      <Button
+                        size="sm"
+                        variant={showWriteReview ? "secondary" : "default"}
+                        onClick={() => setShowWriteReview(!showWriteReview)}
+                        className="gap-2 font-semibold text-xs shadow-sm"
+                      >
+                        {showWriteReview ? (
+                          <>
+                            <X className="size-3.5" /> Batal
+                          </>
+                        ) : (
+                          <>
+                            <Pencil className="size-3.5" /> Tulis Ulasan
+                          </>
+                        )}
+                      </Button>
+                    </div>
 
-                    {/* Reviews List */}
-                    <div className="space-y-4">
-                      {courseReviews.map(r => (
-                        <Card key={r.id} className="p-5 space-y-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-center gap-3">
-                              <Avatar className="size-9 ring-1 ring-primary/20">
-                                {r.userAvatar ? (
-                                  <img src={r.userAvatar} alt={r.userName} className="size-full object-cover" />
-                                ) : (
-                                  <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">{r.userName.slice(0, 2).toUpperCase()}</AvatarFallback>
-                                )}
-                              </Avatar>
-                              <div>
-                                <p className="font-semibold text-sm text-foreground">{r.userName}</p>
-                                <p className="text-xs text-muted-foreground">{r.userRole || "Student"} · {r.createdAt}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-0.5 text-amber-400">
+                    {/* Write Review Card */}
+                    {showWriteReview && (
+                      <Card className="p-5 space-y-4 border-2 border-primary/30 bg-primary/5 animate-in slide-in-from-top duration-200">
+                        <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
+                          <Star className="size-4 text-amber-500 fill-amber-400" /> Berikan Ulasan untuk Kursus Ini
+                        </h4>
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground mb-1 block">Rating Bintang:</label>
+                          <div className="flex items-center gap-1.5 text-amber-400">
+                            {[1, 2, 3, 4, 5].map(s => (
+                              <button
+                                key={s}
+                                type="button"
+                                onClick={() => setNewRating(s)}
+                                className="p-1 hover:scale-125 transition-transform"
+                              >
+                                <Star className={cn("size-6 fill-current", s <= newRating ? "text-amber-400" : "text-muted-foreground/30")} />
+                              </button>
+                            ))}
+                            <span className="text-xs font-bold text-foreground ml-2">({newRating}/5 Bintang)</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground mb-1 block">Komentar Ulasan:</label>
+                          <Textarea
+                            placeholder="Bagaimana pengalaman belajar kamu di kursus ini? Apakah materinya mudah dipahami?"
+                            value={newComment}
+                            onChange={e => setNewComment(e.target.value)}
+                            rows={3}
+                            className="bg-card text-sm"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="ghost" onClick={() => setShowWriteReview(false)}>Batal</Button>
+                          <Button size="sm" onClick={handleAddReviewSubmit} className="gap-1.5 font-semibold">
+                            <Send className="size-3.5" /> Kirim Ulasan ke DB
+                          </Button>
+                        </div>
+                      </Card>
+                    )}
+
+                    {/* Rating Summary Header */}
+                    {courseReviews.length > 0 && (
+                      <Card className="p-6 bg-gradient-to-br from-card via-card to-amber-500/5 border-border">
+                        <div className="flex flex-col sm:flex-row items-center gap-6">
+                          <div className="text-center sm:text-left shrink-0">
+                            <div className="text-5xl font-black text-foreground">{avgRating}</div>
+                            <div className="flex items-center justify-center sm:justify-start gap-1 my-1 text-amber-400">
                               {[1, 2, 3, 4, 5].map(s => (
-                                <Star key={s} className={cn("size-3.5 fill-current", s <= r.rating ? "text-amber-400" : "text-muted-foreground/30")} />
+                                <Star key={s} className={cn("size-4 fill-current", s <= Math.round(Number(avgRating)) ? "text-amber-400" : "text-muted-foreground/30")} />
                               ))}
                             </div>
+                            <p className="text-xs text-muted-foreground">{courseReviews.length} Ulasan Pelajar</p>
                           </div>
-                          <p className="text-xs leading-relaxed text-foreground/90 bg-muted/30 p-3 rounded-xl border border-border/50">
-                            "{r.comment}"
-                          </p>
-                        </Card>
-                      ))}
-                    </div>
+
+                          <div className="flex-1 w-full space-y-1.5 border-t sm:border-t-0 sm:border-l border-border pt-4 sm:pt-0 sm:pl-6">
+                            {starCounts.map(({ star, count, percent }) => (
+                              <div key={star} className="flex items-center gap-2 text-xs">
+                                <span className="w-12 text-muted-foreground font-medium flex items-center gap-1">
+                                  {star} <Star className="size-3 text-amber-400 fill-amber-400" />
+                                </span>
+                                <Progress value={percent} className="h-2 flex-1" />
+                                <span className="w-8 text-right text-muted-foreground">{count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </Card>
+                    )}
+
+                    {/* Reviews List or Empty State */}
+                    {courseReviews.length === 0 ? (
+                      <EmptyState
+                        icon={<MessageSquare className="size-6" />}
+                        title="Belum ada ulasan"
+                        description="Jadilah yang pertama memberikan ulasan untuk kursus ini! Klik 'Tulis Ulasan' di atas."
+                      />
+                    ) : (
+                      <div className="space-y-4">
+                        {courseReviews.map(r => (
+                          <Card key={r.id} className="p-5 space-y-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="size-9 ring-1 ring-primary/20">
+                                  {r.userAvatar ? (
+                                    <img src={r.userAvatar} alt={r.userName} className="size-full object-cover" />
+                                  ) : (
+                                    <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">{r.userName.slice(0, 2).toUpperCase()}</AvatarFallback>
+                                  )}
+                                </Avatar>
+                                <div>
+                                  <p className="font-semibold text-sm text-foreground">{r.userName}</p>
+                                  <p className="text-xs text-muted-foreground">{r.userRole || "Student"} · {r.createdAt}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-0.5 text-amber-400">
+                                {[1, 2, 3, 4, 5].map(s => (
+                                  <Star key={s} className={cn("size-3.5 fill-current", s <= r.rating ? "text-amber-400" : "text-muted-foreground/30")} />
+                                ))}
+                              </div>
+                            </div>
+                            <p className="text-xs leading-relaxed text-foreground/90 bg-muted/30 p-3 rounded-xl border border-border/50">
+                              "{r.comment}"
+                            </p>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })()}
