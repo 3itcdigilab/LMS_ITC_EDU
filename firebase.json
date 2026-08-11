@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "3itcedu",
     "public": "dist",
     "ignore": [
       "firebase.json",
