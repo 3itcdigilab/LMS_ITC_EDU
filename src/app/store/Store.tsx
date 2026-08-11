@@ -204,6 +204,10 @@ export interface AppUser {
   institution: string;
   institutions?: string[];
   status: "Active" | "Suspended"; createdAt: string;
+  avatarUrl?: string;
+  bannerUrl?: string;
+  headline?: string;
+  bio?: string;
 }
 
 export interface Institution {
@@ -641,7 +645,22 @@ function reducer(state: StoreState, action: Action): StoreState {
       const userKey = `${updatedProfile.firstName || ""} ${updatedProfile.lastName || ""}`.trim().toLowerCase();
       const existingMap = state.userProfilesMap || {};
       const newMap = userKey ? { ...existingMap, [userKey]: updatedProfile } : existingMap;
-      return { ...state, profile: updatedProfile, userProfilesMap: newMap };
+
+      const updatedUsers = (state.users || []).map(u => {
+        if ((u.email && updatedProfile.email && u.email.toLowerCase() === updatedProfile.email.toLowerCase()) ||
+            u.id === updatedProfile.id) {
+          return {
+            ...u,
+            avatarUrl: updatedProfile.avatarUrl || u.avatarUrl,
+            bannerUrl: updatedProfile.bannerUrl || u.bannerUrl,
+            headline: updatedProfile.headline || u.headline,
+            bio: updatedProfile.bio || u.bio,
+          };
+        }
+        return u;
+      });
+
+      return { ...state, profile: updatedProfile, users: updatedUsers, userProfilesMap: newMap };
     }
     case "SET_ACTIVE_PROFILE_BY_NAME": {
       const { name, defaultRole, institution, email } = action.payload;
@@ -1268,20 +1287,77 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const capitalizeRole = (r: string) => r ? r.charAt(0).toUpperCase() + r.slice(1).toLowerCase() : "Student";
     const unsubProfiles = onSnapshot(collection(db, "profiles"), (snap) => {
       if (!snap.empty) {
+        const userProfilesMap: Record<string, UserProfile> = { ...(state.userProfilesMap || {}) };
+        let matchingProfilePatch: Partial<UserProfile> | null = null;
+
         const users = snap.docs.map(d => {
           const data = d.data();
+          const fullName = data.name || `${data.first_name || ""} ${data.last_name || ""}`.trim() || data.email || "";
+          const avatarUrl = data.avatarUrl || data.avatar_url || "";
+          const bannerUrl = data.bannerUrl || data.banner_url || "";
+          const headline = data.headline || "";
+          const bio = data.bio || "";
+          const email = data.email || "";
+
+          // Populate userProfilesMap for public profile modals and member lists
+          const userKey = fullName.toLowerCase();
+          if (userKey) {
+            userProfilesMap[userKey] = {
+              ...defaultProfile,
+              id: d.id,
+              firstName: data.first_name || fullName.split(" ")[0] || "User",
+              lastName: data.last_name || fullName.split(" ").slice(1).join(" ") || "",
+              email,
+              headline,
+              bio,
+              avatarUrl,
+              bannerUrl,
+              institution: data.institution || "3ITC Digital Education",
+              city: data.city || "",
+              phone: data.phone || "",
+              experiences: data.experiences || [],
+              educations: data.educations || [],
+              skills: data.skills || [],
+            };
+          }
+
+          // Check if this doc matches the active profile email
+          if (email && state.profile?.email && email.toLowerCase() === state.profile.email.toLowerCase()) {
+            matchingProfilePatch = {
+              avatarUrl: avatarUrl || state.profile.avatarUrl,
+              bannerUrl: bannerUrl || state.profile.bannerUrl,
+              headline: headline || state.profile.headline,
+              bio: bio || state.profile.bio,
+              city: data.city || state.profile.city,
+              institution: data.institution || state.profile.institution,
+              experiences: data.experiences || state.profile.experiences,
+              educations: data.educations || state.profile.educations,
+              skills: data.skills || state.profile.skills,
+            };
+          }
+
           return {
             id: d.id,
-            name: data.name || `${data.first_name || ""} ${data.last_name || ""}`.trim() || data.email || "",
-            email: data.email || "",
+            name: fullName,
+            email,
             password: data.password || "gaadapasswordnya",
             role: capitalizeRole(data.role || "student"),
             institution: data.institution || "3ITC Digital Education",
             status: data.status || "Active",
+            avatarUrl,
+            bannerUrl,
+            headline,
+            bio,
             createdAt: data.createdAt || data.created_at || new Date().toISOString(),
           };
         });
-        dispatch({ type: "HYDRATE", payload: { users } });
+
+        const patch: Partial<StoreState> = { users, userProfilesMap };
+        if (matchingProfilePatch) {
+          patch.profile = { ...state.profile, ...matchingProfilePatch };
+        }
+
+        dispatch({ type: "HYDRATE", payload: patch });
         cacheSet("3itc_users_cache", users);
       }
     }, err => console.warn("Firestore profiles listener:", err));
@@ -1347,12 +1423,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "UPDATE_PROFILE", payload: p });
       if (state.profile?.email) {
         const uId = `user-${state.profile.email.replace(/[^a-zA-Z0-9]/g, "-")}`;
+        const fullName = `${p.firstName !== undefined ? p.firstName : (state.profile.firstName || "")} ${p.lastName !== undefined ? p.lastName : (state.profile.lastName || "")}`.trim();
+        const parts = fullName.split(" ");
         fsSet("profiles", uId, {
-          name: `${p.firstName || state.profile.firstName || ""} ${p.lastName || state.profile.lastName || ""}`.trim(),
+          name: fullName,
+          first_name: parts[0] || "",
+          last_name: parts.slice(1).join(" ") || "",
           email: state.profile.email,
-          institution: p.institution || state.profile.institution,
-          headline: p.headline || state.profile.headline,
-          bio: p.bio || state.profile.bio,
+          institution: p.institution !== undefined ? p.institution : (state.profile.institution || "3ITC Digital Education"),
+          headline: p.headline !== undefined ? p.headline : (state.profile.headline || ""),
+          bio: p.bio !== undefined ? p.bio : (state.profile.bio || ""),
+          avatarUrl: p.avatarUrl !== undefined ? p.avatarUrl : (state.profile.avatarUrl || ""),
+          bannerUrl: p.bannerUrl !== undefined ? p.bannerUrl : (state.profile.bannerUrl || ""),
+          city: p.city !== undefined ? p.city : (state.profile.city || ""),
+          phone: p.phone !== undefined ? p.phone : (state.profile.phone || ""),
+          experiences: p.experiences || state.profile.experiences || [],
+          educations: p.educations || state.profile.educations || [],
+          skills: p.skills || state.profile.skills || [],
+          updatedAt: new Date().toISOString(),
         });
       }
     },
