@@ -520,6 +520,18 @@ const defaultEvents: EventItem[] = [
   }
 ];
 
+const getInitialEvents = (): EventItem[] => {
+  if (typeof window === "undefined") return defaultEvents;
+  try {
+    const saved = localStorage.getItem("3itc_events_cache");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (_) {}
+  return defaultEvents;
+};
+
 const initialState: StoreState = {
   profile: getInitialProfile(),
   courses: [],
@@ -527,7 +539,7 @@ const initialState: StoreState = {
   users: [],
   institutions: defaultInstitutions,
   forumThreads: [],
-  events: defaultEvents,
+  events: getInitialEvents(),
   portfolioProjects: [],
   certificates: [],
   landingContent: getInitialLandingContent(),
@@ -1429,25 +1441,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }, err => console.warn("Firestore reviews listener:", err));
 
     const unsubFeed = onSnapshot(collection(db, "feedPosts"), (snap) => {
-      if (!snap.empty) {
-        const feedPosts = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
-        dispatch({ type: "HYDRATE", payload: { feedPosts } });
-      }
+      const feedPosts = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+      dispatch({ type: "HYDRATE", payload: { feedPosts } });
+      cacheSet("3itc_feed_cache", feedPosts);
     }, err => console.warn("Firestore feedPosts listener:", err));
 
     const unsubForum = onSnapshot(collection(db, "forumThreads"), (snap) => {
-      if (!snap.empty) {
-        const forumThreads = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
-        dispatch({ type: "HYDRATE", payload: { forumThreads } });
-      }
+      const forumThreads = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+      dispatch({ type: "HYDRATE", payload: { forumThreads } });
+      cacheSet("3itc_forum_cache", forumThreads);
     }, err => console.warn("Firestore forumThreads listener:", err));
 
     const unsubEvents = onSnapshot(collection(db, "events"), (snap) => {
-      if (!snap.empty) {
-        const events = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
-        dispatch({ type: "HYDRATE", payload: { events } });
-        cacheSet("3itc_events_cache", events);
-      }
+      const events = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any;
+      dispatch({ type: "HYDRATE", payload: { events } });
+      cacheSet("3itc_events_cache", events);
     }, err => console.warn("Firestore events listener:", err));
 
     const unsubLanding = onSnapshot(doc(db, "settings", "landing"), (snap) => {
