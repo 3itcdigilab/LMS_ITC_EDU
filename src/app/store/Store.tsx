@@ -1222,7 +1222,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from("enrollments").select("*"),
         supabase.from("reviews").select("*"),
         supabase.from("feed_posts").select("*"),
-      ]).then(([coursesRes, enrollmentsRes, reviewsRes, feedsRes]) => {
+        supabase.from("profiles").select("*"),
+      ]).then(([coursesRes, enrollmentsRes, reviewsRes, feedsRes, profilesRes]) => {
         const patch: Partial<StoreState> = {};
         if (coursesRes.data && coursesRes.data.length > 0) patch.courses = coursesRes.data as any;
         if (enrollmentsRes.data && enrollmentsRes.data.length > 0) {
@@ -1265,6 +1266,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             originalPost: f.original_post,
             comments: f.comments || [],
             createdAt: f.created_at,
+          }));
+        }
+        if (profilesRes.data && profilesRes.data.length > 0) {
+          patch.users = profilesRes.data.map(p => ({
+            id: p.id,
+            name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email,
+            email: p.email,
+            role: p.role || "student",
+            institution: p.institution || "3ITC Digital Education",
+            status: "Active",
+            createdAt: p.created_at || new Date().toISOString(),
           }));
         }
         if (Object.keys(patch).length > 0) {

@@ -104,7 +104,7 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
     );
     if (defaultAccKey) {
       const acc = DEFAULT_ACCOUNTS[defaultAccKey];
-      if (acc.pass === cleanPass) {
+      if (acc.pass === cleanPass || acc.pass.toLowerCase() === cleanPass.toLowerCase()) {
         syncUserProfile(acc.name, acc.institution, acc.role);
         onLogin(acc.role);
         return;
@@ -132,7 +132,7 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
 
     // Check password if set, or accept default role pass
     if (foundUser.password) {
-      if (foundUser.password !== cleanPass) {
+      if (foundUser.password !== cleanPass && foundUser.password.toLowerCase() !== cleanPass.toLowerCase()) {
         setErrorMsg("Password yang Anda masukkan salah. Silakan periksa kembali!");
         return;
       }
@@ -225,6 +225,9 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="pl-9"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       required
                     />
                   </div>
@@ -241,6 +244,9 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-9"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       required
                     />
                   </div>
