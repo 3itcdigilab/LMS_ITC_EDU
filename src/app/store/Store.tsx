@@ -6,7 +6,7 @@
 import { createContext, useContext, useReducer, useEffect, type ReactNode } from "react";
 import { type Role } from "../data/mock";
 import { db } from "../lib/firebase";
-import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, onSnapshot, getDoc, getDocs } from "firebase/firestore";
 
 // ─── Curriculum content types ─────────────────────────────────────────────────
 
@@ -1522,6 +1522,61 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       unsubEvents(); unsubBadges(); unsubAssessments(); unsubPortfolio();
       unsubCertificates(); unsubLanding();
     };
+  }, []);
+
+  // ─── Auto-seed initial Firestore collections if empty so all collections show in Firebase Console ───
+  useEffect(() => {
+    getDoc(doc(db, "settings", "landing")).then(snap => {
+      if (!snap.exists()) {
+        fsSet("settings", "landing", defaultLandingContent);
+      }
+    }).catch(_ => {});
+
+    getDocs(collection(db, "badges")).then(snap => {
+      if (snap.empty) {
+        const defaultBadgesList = [
+          { id: "b-1", name: "TypeScript Specialist", category: "Skill", description: "Menguasai TypeScript dari tingkat dasar hingga lanjut.", iconUrl: "https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=200&auto=format&fit=crop&q=80", createdAt: new Date().toISOString() },
+          { id: "b-2", name: "AI Practitioner", category: "Achievement", description: "Menyelesaikan kursus AI & Machine Learning.", iconUrl: "https://images.unsplash.com/photo-1677442136019-21780efad99a?w=200&auto=format&fit=crop&q=80", createdAt: new Date().toISOString() },
+        ];
+        defaultBadgesList.forEach(b => fsSet("badges", b.id, b));
+      }
+    }).catch(_ => {});
+
+    getDocs(collection(db, "assessments")).then(snap => {
+      if (snap.empty) {
+        const defaultAssList = [
+          { id: "ass-1", title: "Kuis Dasar React & State Management", type: "Quiz", passingScore: 80, dueDate: "2026-08-30", submissionsCount: 12, createdAt: new Date().toISOString() }
+        ];
+        defaultAssList.forEach(a => fsSet("assessments", a.id, a));
+      }
+    }).catch(_ => {});
+
+    getDocs(collection(db, "reviews")).then(snap => {
+      if (snap.empty) {
+        const defaultRevList = [
+          { id: "rev-1", courseId: "c-1", userName: "Ahmad Rizky", userRole: "Student", rating: 5, comment: "Materi sangat jelas dan praktis untuk pemula!", createdAt: new Date().toISOString() }
+        ];
+        defaultRevList.forEach(r => fsSet("reviews", r.id, r));
+      }
+    }).catch(_ => {});
+
+    getDocs(collection(db, "forumThreads")).then(snap => {
+      if (snap.empty) {
+        const defaultForumList = [
+          { id: "thread-1", title: "Diskusi: Best Practice arsitektur Next.js App Router", body: "Bagaimana cara terbaik mengorganisasi Server vs Client Components?", authorName: "Tubagus Aria", category: "Programming", replies: 2, createdAt: new Date().toISOString() }
+        ];
+        defaultForumList.forEach(t => fsSet("forumThreads", t.id, t));
+      }
+    }).catch(_ => {});
+
+    getDocs(collection(db, "feedPosts")).then(snap => {
+      if (snap.empty) {
+        const defaultFeedList = [
+          { id: "feed-1", authorName: "Tubagus Aria", authorRole: "Admin", content: "Selamat datang di platform 3ITC Digital Education!", createdAt: new Date().toISOString() }
+        ];
+        defaultFeedList.forEach(f => fsSet("feedPosts", f.id, f));
+      }
+    }).catch(_ => {});
   }, []);
 
   // ─── Helper: write to Firestore ───
