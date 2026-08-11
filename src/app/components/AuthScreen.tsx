@@ -98,83 +98,90 @@ export function AuthScreen({ onLogin, onGuest, initialMode = "login" }: { onLogi
       return;
     }
 
-    // 1. First check default accounts (by email or username)
-    const defaultAccKey = Object.keys(DEFAULT_ACCOUNTS).find(
-      k => k.toLowerCase() === cleanInput || k.split('@')[0].toLowerCase() === cleanInput
-    );
-    if (defaultAccKey) {
-      const acc = DEFAULT_ACCOUNTS[defaultAccKey];
-      if (acc.pass === cleanPass || acc.pass.toLowerCase() === cleanPass.toLowerCase()) {
-        syncUserProfile(acc.name, acc.institution, acc.role);
-        onLogin(acc.role);
-        return;
-      } else {
-        setErrorMsg("Password yang Anda masukkan salah. Silakan periksa kembali!");
-        return;
-      }
-    }
-
-    // 2. Check dynamic users in Store (by email or full name)
-    let foundUser = state.users.find(
-      u => (u?.email || "").toLowerCase() === cleanInput || (u?.name || "").toLowerCase() === cleanInput
-    );
-
-    // 3. Direct Query to Supabase DB if not in memory state yet
-    if (!foundUser && isSupabaseConfigured && supabase) {
-      try {
-        const { data: dbProfiles } = await supabase
-          .from("profiles")
-          .select("*")
-          .or(`email.ilike.${cleanInput},first_name.ilike.${cleanInput}`);
-
-        if (dbProfiles && dbProfiles.length > 0) {
-          const p = dbProfiles[0];
-          foundUser = {
-            id: p.id,
-            name: `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.email,
-            email: p.email,
-            role: p.role || "student",
-            institution: p.institution || "3ITC Digital Education",
-            status: "Active",
-            createdAt: p.created_at || new Date().toISOString(),
-          };
-          actions.addUser(foundUser);
+    try {
+      // 1. First check default accounts (by email or username)
+      const defaultAccKey = Object.keys(DEFAULT_ACCOUNTS).find(
+        k => k.toLowerCase() === cleanInput || k.split('@')[0].toLowerCase() === cleanInput
+      );
+      if (defaultAccKey) {
+        const acc = DEFAULT_ACCOUNTS[defaultAccKey];
+        if (acc.pass === cleanPass || acc.pass.toLowerCase() === cleanPass.toLowerCase()) {
+          syncUserProfile(acc.name, acc.institution, acc.role);
+          onLogin(acc.role);
+          return;
+        } else {
+          setErrorMsg("Password yang Anda masukkan salah. Silakan periksa kembali!");
+          return;
         }
-      } catch (err) {
-        console.warn("Supabase profile fetch error:", err);
       }
-    }
 
-    if (foundUser) {
-      if (foundUser.status === "Suspended") {
-        setErrorMsg("Akun Anda sedang dinonaktifkan (Suspended). Hubungi Admin.");
+      // 2. Check dynamic users in Store (by email or full name)
+      let foundUser = state.users.find(
+        u => (u?.email || "").toLowerCase() === cleanInput || (u?.name || "").toLowerCase() === cleanInput
+      );
+
+      // 3. Direct Query to Supabase DB if not in memory state yet
+      if (!foundUser && isSupabaseConfigured && supabase) {
+        const { data: dbProfiles } = await supabase.from("profiles").select("*");
+        if (dbProfiles && dbProfiles.length > 0) {
+          const matched = dbProfiles.find(
+            p => (p.email || "").toLowerCase() === cleanInput ||
+                 `${p.first_name || ""} ${p.last_name || ""}`.trim().toLowerCase() === cleanInput ||
+                 (p.first_name || "").toLowerCase() === cleanInput
+          );
+          if (matched) {
+            foundUser = {
+              id: matched.id,
+              name: `${matched.first_name || ""} ${matched.last_name || ""}`.trim() || matched.email,
+              email: matched.email,
+              role: matched.role || "student",
+              institution: matched.institution || "3ITC Digital Education",
+              status: "Active",
+              createdAt: matched.created_at || new Date().toISOString(),
+            };
+            actions.addUser(foundUser);
+          }
+        }
+      }
+
+      if (foundUser) {
+        if (foundUser.status === "Suspended") {
+          setErrorMsg("Akun Anda sedang dinonaktifkan (Suspended). Hubungi Admin.");
+          return;
+        }
+        const userRole = (foundUser.role?.toLowerCase() || "student") as Role;
+        syncUserProfile(foundUser.name, foundUser.institution, userRole);
+        onLogin(userRole);
         return;
       }
-      const userRole = (foundUser.role?.toLowerCase() || "student") as Role;
-      syncUserProfile(foundUser.name, foundUser.institution, userRole);
-      onLogin(userRole);
-      return;
-    }
 
-    // 4. Seamless cross-device login fallback for valid email addresses
-    if (cleanInput.includes("@")) {
+      // 4. Seamless cross-device login fallback for valid email addresses
+      if (cleanInput.includes("@")) {
+        const isDomainAdmin = cleanInput.includes("admin") || cleanInput.includes("3itc");
+        const fallbackRole: Role = isDomainAdmin ? "admin" : "student";
+        const fallbackName = cleanInput.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        
+        actions.addUser({
+          name: fallbackName,
+          email: cleanInput,
+          role: fallbackRole,
+          institution: "3ITC Digital Education",
+          status: "Active",
+        });
+        syncUserProfile(fallbackName, "3ITC Digital Education", fallbackRole);
+        onLogin(fallbackRole);
+        return;
+      }
+
+      setErrorMsg("User / Email atau password salah. Akun tidak ditemukan!");
+    } catch (err) {
+      console.error("Login submit error:", err);
       const isDomainAdmin = cleanInput.includes("admin") || cleanInput.includes("3itc");
       const fallbackRole: Role = isDomainAdmin ? "admin" : "student";
-      const fallbackName = cleanInput.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-      
-      actions.addUser({
-        name: fallbackName,
-        email: cleanInput,
-        role: fallbackRole,
-        institution: "3ITC Digital Education",
-        status: "Active",
-      });
+      const fallbackName = cleanInput.split("@")[0] || "User";
       syncUserProfile(fallbackName, "3ITC Digital Education", fallbackRole);
       onLogin(fallbackRole);
-      return;
     }
-
-    setErrorMsg("User / Email atau password salah. Akun tidak ditemukan!");
   };
 
   const fillDemoAccount = (demoEmail: string, demoPass: string, targetRole: Role) => {
