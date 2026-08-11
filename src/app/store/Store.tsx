@@ -457,14 +457,43 @@ const defaultLandingContent: LandingContent = {
   ],
 };
 
+const defaultInstitutions: Institution[] = [
+  {
+    id: "inst-3itc",
+    name: "3ITC",
+    type: "Other",
+    region: "Jakarta",
+    plan: "Free",
+    status: "Active",
+    students: 120,
+    teachers: 15,
+    createdAt: new Date().toISOString(),
+  }
+];
+
+const defaultEvents: EventItem[] = [
+  {
+    id: "evt-1",
+    title: "Webinar: Masa Depan Artificial Intelligence & Career in Tech",
+    speaker: "Tubagus Aria & Tim 3ITC",
+    speakerRole: "Lead Tech Educator",
+    date: "2026-08-20",
+    time: "19:00 - 21:00 WIB",
+    category: "AI & Career",
+    description: "Pelajari tren industri AI terkini dan persiapkan karir teknologi bersama pakar dari 3ITC Digital Education.",
+    link: "https://meet.google.com/3itc-demo",
+    registeredCount: 42,
+  }
+];
+
 const initialState: StoreState = {
   profile: defaultProfile,
   courses: [],
   enrollments: [],
   users: [],
-  institutions: [],
+  institutions: defaultInstitutions,
   forumThreads: [],
-  events: [],
+  events: defaultEvents,
   portfolioProjects: [],
   certificates: [],
   landingContent: defaultLandingContent,
@@ -1421,9 +1450,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from("profiles").delete().eq("id", id).then(({ error }) => { if (error) console.warn("Supabase deleteUser error:", error); });
       }
     },
-    addInstitution: d => dispatch({ type: "ADD_INSTITUTION", payload: d }),
-    updateInstitution: p => dispatch({ type: "UPDATE_INSTITUTION", payload: p }),
-    deleteInstitution: id => dispatch({ type: "DELETE_INSTITUTION", payload: id }),
+    addInstitution: d => {
+      dispatch({ type: "ADD_INSTITUTION", payload: d });
+      if (isSupabaseConfigured && supabase) {
+        supabase.from("institutions").upsert({
+          id: `inst-${Date.now()}`,
+          name: d.name,
+          type: d.type || "Other",
+          region: d.region || "Jakarta",
+          plan: d.plan || "Free",
+          status: d.status || "Active",
+          students: d.students || 0,
+          teachers: d.teachers || 0,
+        }).then(({ error }) => { if (error) console.warn("Supabase addInstitution error:", error); });
+      }
+    },
+    updateInstitution: p => {
+      dispatch({ type: "UPDATE_INSTITUTION", payload: p });
+      if (isSupabaseConfigured && supabase) {
+        supabase.from("institutions").update({
+          name: p.name,
+          type: p.type,
+          region: p.region,
+          plan: p.plan,
+          status: p.status,
+          students: p.students,
+          teachers: p.teachers,
+        }).eq("id", p.id).then(({ error }) => { if (error) console.warn("Supabase updateInstitution error:", error); });
+      }
+    },
+    deleteInstitution: id => {
+      dispatch({ type: "DELETE_INSTITUTION", payload: id });
+      if (isSupabaseConfigured && supabase) {
+        supabase.from("institutions").delete().eq("id", id).then(({ error }) => { if (error) console.warn("Supabase deleteInstitution error:", error); });
+      }
+    },
     addForumThread: d => {
       dispatch({ type: "ADD_FORUM_THREAD", payload: d });
       if (isSupabaseConfigured && supabase) {
