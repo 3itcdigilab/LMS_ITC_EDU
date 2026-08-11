@@ -699,28 +699,44 @@ export function LandingPage() {
 
         {publishedCourses.length > 0 ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {publishedCourses.map((course: any) => (
-              <Card key={course.id} className="overflow-hidden flex flex-col hover:shadow-xl transition-all duration-300 group cursor-pointer border-border/50" onClick={() => navigate('/login')}>
-                <div className="relative aspect-video bg-muted overflow-hidden">
-                  {course.thumbnailUrl ? (
-                    <img src={course.thumbnailUrl} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary/10 to-primary/10">
-                       <BookOpen className="w-12 h-12 text-muted-foreground/30" />
+            {publishedCourses.map((course: any) => {
+              const getCourseThumbnail = (c: any) => {
+                if (c.thumbnailUrl && typeof c.thumbnailUrl === "string" && c.thumbnailUrl.trim()) return c.thumbnailUrl;
+                if (c.thumbnail && typeof c.thumbnail === "string" && c.thumbnail.trim()) return c.thumbnail;
+                if (c.image && typeof c.image === "string" && c.image.trim()) return c.image;
+                if (c.imageUrl && typeof c.imageUrl === "string" && c.imageUrl.trim()) return c.imageUrl;
+                
+                const categoryImages: Record<string, string> = {
+                  Programming: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1000&q=80",
+                  "AI & Machine Learning": "https://images.unsplash.com/photo-1677442136019-21780efad99a?auto=format&fit=crop&w=1000&q=80",
+                  AI: "https://images.unsplash.com/photo-1677442136019-21780efad99a?auto=format&fit=crop&w=1000&q=80",
+                  "Data Science": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1000&q=80",
+                  "Cyber Security": "https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&w=1000&q=80",
+                  "UI/UX Design": "https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?auto=format&fit=crop&w=1000&q=80",
+                  "UI/UX": "https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?auto=format&fit=crop&w=1000&q=80",
+                  "Digital Business": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1000&q=80",
+                  "IoT & Robotics": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1000&q=80",
+                  "Software Engineering": "https://images.unsplash.com/photo-1607799279861-4dd421887fb3?auto=format&fit=crop&w=1000&q=80",
+                };
+                return categoryImages[c.category] || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1000&q=80";
+              };
+
+              return (
+                <Card key={course.id} className="overflow-hidden flex flex-col hover:shadow-xl transition-all duration-300 group cursor-pointer border-border/50" onClick={() => navigate('/login')}>
+                  <div className="relative aspect-video bg-muted overflow-hidden">
+                    <img src={getCourseThumbnail(course)} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <div className="absolute top-4 left-4">
+                      <Badge variant="secondary" className="bg-background/90 backdrop-blur shadow-sm">
+                        {course.category}
+                      </Badge>
                     </div>
-                  )}
-                  <div className="absolute top-4 left-4">
-                    <Badge variant="secondary" className="bg-background/90 backdrop-blur shadow-sm">
-                      {course.category}
-                    </Badge>
-                  </div>
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white">
-                      <Play className="w-5 h-5 ml-1" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white">
+                        <Play className="w-5 h-5 ml-1" />
+                      </div>
                     </div>
                   </div>
-                </div>
-                <CardHeader className="flex-grow pb-2">
+                  <CardHeader className="flex-grow pb-2">
                   <div className="flex items-center space-x-1 text-amber-500 mb-2">
                     <Star className="w-4 h-4 fill-current" />
                     <span className="text-sm font-medium">{course.rating || '4.8'}</span>
@@ -750,7 +766,8 @@ export function LandingPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            );
+          })}
           </div>
         ) : (
           <div className="text-center py-20 bg-muted/30 rounded-3xl border border-border border-dashed">

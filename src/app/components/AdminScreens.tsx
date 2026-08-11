@@ -641,6 +641,47 @@ function AddCourseModal({ onClose }: { onClose: () => void }) {
           <textarea className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/20" rows={3} value={form.summary} onChange={e => set("summary", e.target.value)} placeholder="Deskripsi singkat kursus…" />
         </div>
         <div>
+          <label className="text-sm font-medium">Gambar Sampul / Cover Kursus</label>
+          <div className="mt-1 flex items-center gap-3">
+            {form.thumbnail ? (
+              <img src={form.thumbnail} alt="" className="size-14 rounded-lg object-cover border border-border" />
+            ) : (
+              <div className="size-14 rounded-lg border border-dashed border-border bg-muted flex items-center justify-center text-[10px] text-muted-foreground">
+                Foto Cover
+              </div>
+            )}
+            <div className="flex-1 space-y-1.5">
+              <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm">
+                <Upload className="size-3.5" /> Upload Foto Cover
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                      const dataUrl = evt.target?.result as string;
+                      if (dataUrl) {
+                        setForm(f => ({ ...f, thumbnail: dataUrl, thumbnailUrl: dataUrl }));
+                        toast.success("Foto cover di-upload!");
+                      }
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+              </label>
+              <Input
+                placeholder="Atau URL Gambar (https://...)"
+                value={form.thumbnail || ""}
+                onChange={e => setForm(f => ({ ...f, thumbnail: e.target.value, thumbnailUrl: e.target.value }))}
+                className="text-xs"
+              />
+            </div>
+          </div>
+        </div>
+        <div>
           <label className="text-sm font-medium">Status awal</label>
           <select className="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm" value={form.status} onChange={e => set("status", e.target.value)}>
             <option value="draft">Draft</option>
